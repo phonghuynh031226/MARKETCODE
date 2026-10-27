@@ -1,0 +1,8 @@
+/**
+ * MARKETCODE - CLEAN LIGHT MODE CORE STYLES
+ * All templates now natively use Tailwind Clean Light SaaS classes.
+ */
+html, body {
+    background-color: #F8FAFC;
+    color: #0f172a;
+}

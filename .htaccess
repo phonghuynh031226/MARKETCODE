@@ -1,0 +1,56 @@
+# ========================================================
+# MARKETCODE - Apache Clean URLs & Security Configuration
+# ========================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # 1. Chặn truy cập trực tiếp vào các thư mục hệ thống nhạy cảm
+    RewriteRule ^(config|includes|brain|\.git)/ - [F,L,NC]
+
+    # 2. Redirect 301 vĩnh viễn nếu người dùng gõ trực tiếp /index.php -> /
+    RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /index\.php [NC]
+    RewriteRule ^index\.php$ / [R=301,L]
+
+    # Redirect 301 cho admin/index.php -> admin/
+    RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /admin/index\.php [NC]
+    RewriteRule ^admin/index\.php$ /admin/ [R=301,L]
+
+    # 3. Redirect 301 từ URL có đuôi .php sang URL sạch (ngoại trừ /api/ và /ajax/)
+    RewriteCond %{REQUEST_METHOD} !POST
+    RewriteCond %{REQUEST_URI} !^/(api|ajax)/ [NC]
+    RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /([^.]+)\.php [NC]
+    RewriteRule ^([^.]+)\.php$ /$1 [R=301,L]
+
+    # 4. Alias đặc biệt cho Clean URLs
+    RewriteRule ^deposit/?$ deposit.php [L,QSA]
+    RewriteRule ^recharge/?$ deposit.php [L,QSA]
+    RewriteRule ^register/?$ register.php [L,QSA]
+    RewriteRule ^forgot-password/?$ forgot_password.php [L,QSA]
+    RewriteRule ^reset-password/?$ reset_password.php [L,QSA]
+
+    # Admin Clean URLs
+    RewriteRule ^admin/deposits/?$ admin/transactions.php [L,QSA]
+    RewriteRule ^admin/categories/?$ admin/categories.php [L,QSA]
+    RewriteRule ^admin/products/?$ admin/products.php [L,QSA]
+    RewriteRule ^admin/orders/?$ admin/orders.php [L,QSA]
+    RewriteRule ^admin/transactions/?$ admin/transactions.php [L,QSA]
+    RewriteRule ^admin/users/?$ admin/users.php [L,QSA]
+    RewriteRule ^admin/settings/?$ admin/settings.php [L,QSA]
+
+    # 5. Tự động ánh xạ URL sạch sang file .php tương ứng (cả ở root và thư mục con như admin)
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME}.php -f
+    RewriteRule ^(.*)$ $1.php [L,QSA]
+</IfModule>
+
+# Bảo vệ các file cấu hình quan trọng
+<FilesMatch "^(config\.php|database\.php|\.env|\.htaccess)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Ngăn chặn duyệt thư mục (Directory Listing)
+Options -Indexes
