@@ -12,6 +12,15 @@ $user = current_user();
     <title><?= isset($pageTitle) ? xss_clean($pageTitle) . ' | ' : '' ?><?= xss_clean($siteName) ?></title>
     <meta name="description" content="<?= xss_clean($siteDesc) ?>">
     
+    <?php
+    $siteFavicon = get_setting('site_favicon', '');
+    if (!empty($siteFavicon)) {
+        $faviconUrl = preg_match('#^https?://#i', $siteFavicon) ? $siteFavicon : BASE_URL . '/' . ltrim($siteFavicon, '/');
+    ?>
+    <link rel="icon" href="<?= htmlspecialchars($faviconUrl) ?>">
+    <link rel="shortcut icon" href="<?= htmlspecialchars($faviconUrl) ?>">
+    <?php } ?>
+    
     <!-- Clean URL Script: Tự động làm sạch đuôi .php và index.php trên thanh địa chỉ ngay tức thì -->
     <script>
         (function() {

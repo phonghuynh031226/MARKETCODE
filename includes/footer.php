@@ -3,14 +3,42 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
             <!-- Col 1: Brand & Bio -->
             <div class="lg:col-span-2 space-y-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
-                        <i class="fa-solid fa-code text-lg"></i>
-                    </div>
-                    <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 bg-clip-text text-transparent">
-                        MARKET<span class="text-indigo-600">CODE</span>
-                    </span>
-                </div>
+                <?php
+                $footerLogo = get_setting('site_logo', '');
+                $footerLogoUrl = '';
+                $isFooterLogoWide = false;
+                if (!empty($footerLogo)) {
+                    $footerLogoPath = ROOT_PATH . '/' . ltrim($footerLogo, '/');
+                    if (file_exists($footerLogoPath) || preg_match('#^https?://#i', $footerLogo)) {
+                        $footerLogoUrl = preg_match('#^https?://#i', $footerLogo) ? $footerLogo : BASE_URL . '/' . ltrim($footerLogo, '/');
+                        if (file_exists($footerLogoPath)) {
+                            $imgSize = @getimagesize($footerLogoPath);
+                            if ($imgSize && $imgSize[0] > $imgSize[1] * 1.8) {
+                                $isFooterLogoWide = true;
+                            }
+                        }
+                    }
+                }
+                ?>
+                <a href="<?= BASE_URL ?>/" class="inline-flex items-center gap-3 group">
+                    <?php if (!empty($footerLogoUrl)): ?>
+                        <?php if ($isFooterLogoWide): ?>
+                            <img src="<?= htmlspecialchars($footerLogoUrl) ?>" alt="MarketCode Logo" class="h-10 w-auto max-w-[200px] object-contain group-hover:scale-105 transition-transform duration-300">
+                        <?php else: ?>
+                            <img src="<?= htmlspecialchars($footerLogoUrl) ?>" alt="MarketCode Logo" class="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-sm group-hover:scale-105 transition-transform duration-300">
+                            <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 bg-clip-text text-transparent">
+                                MARKET<span class="text-indigo-600">CODE</span>
+                            </span>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-300">
+                            <i class="fa-solid fa-code text-lg"></i>
+                        </div>
+                        <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 bg-clip-text text-transparent">
+                            MARKET<span class="text-indigo-600">CODE</span>
+                        </span>
+                    <?php endif; ?>
+                </a>
                 <p class="text-sm text-slate-600 leading-relaxed max-w-sm">
                     Hệ thống sàn giao dịch mã nguồn tự động hóa 100%. Cung cấp source code website, app mobile, script bot chất lượng cao, sạch mã độc và hỗ trợ cài đặt nhanh chóng.
                 </p>

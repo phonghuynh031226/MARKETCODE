@@ -36,6 +36,15 @@ $currentAdminPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= isset($pageTitle) ? xss_clean($pageTitle) . ' | Admin CP' : 'Admin Control Panel' ?></title>
 
+    <?php
+    $siteFavicon = get_setting('site_favicon', '');
+    if (!empty($siteFavicon)) {
+        $faviconUrl = preg_match('#^https?://#i', $siteFavicon) ? $siteFavicon : BASE_URL . '/' . ltrim($siteFavicon, '/');
+    ?>
+    <link rel="icon" href="<?= htmlspecialchars($faviconUrl) ?>">
+    <link rel="shortcut icon" href="<?= htmlspecialchars($faviconUrl) ?>">
+    <?php } ?>
+
     <!-- Clean URL Script for Admin Panel -->
     <script>
         (function() {

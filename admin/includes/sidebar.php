@@ -8,15 +8,29 @@ $currentAdminPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
 <aside class="w-64 bg-white border-r border-slate-200 flex flex-col justify-between hidden lg:flex sticky top-0 h-screen shrink-0 z-40 shadow-sm">
     <div>
         <!-- Brand -->
-        <div class="h-20 flex items-center px-6 border-b border-slate-200 gap-3">
-            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
-                <i class="fa-solid fa-shield-halved text-lg"></i>
-            </div>
+        <a href="<?= BASE_URL ?>/admin/" class="h-20 flex items-center px-6 border-b border-slate-200 gap-3 group">
+            <?php
+            $adminLogo = get_setting('site_logo', '');
+            $adminLogoUrl = '';
+            if (!empty($adminLogo)) {
+                $adminLogoPath = (defined('ROOT_PATH') ? ROOT_PATH : dirname(dirname(__DIR__))) . '/' . ltrim($adminLogo, '/');
+                if (file_exists($adminLogoPath) || preg_match('#^https?://#i', $adminLogo)) {
+                    $adminLogoUrl = preg_match('#^https?://#i', $adminLogo) ? $adminLogo : BASE_URL . '/' . ltrim($adminLogo, '/');
+                }
+            }
+            ?>
+            <?php if (!empty($adminLogoUrl)): ?>
+                <img src="<?= htmlspecialchars($adminLogoUrl) ?>" alt="Logo" class="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-sm group-hover:scale-105 transition-transform">
+            <?php else: ?>
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+                    <i class="fa-solid fa-shield-halved text-lg"></i>
+                </div>
+            <?php endif; ?>
             <div>
-                <span class="text-base font-extrabold tracking-tight text-slate-900 block">ADMIN PANEL</span>
+                <span class="text-base font-extrabold tracking-tight text-slate-900 block group-hover:text-indigo-600 transition-colors">ADMIN PANEL</span>
                 <span class="text-[10px] text-slate-500 font-semibold uppercase">Management Suite</span>
             </div>
-        </div>
+        </a>
 
         <!-- Navigation Links -->
         <nav class="p-4 space-y-1.5 text-sm">

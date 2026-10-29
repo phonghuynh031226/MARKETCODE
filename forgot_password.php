@@ -94,15 +94,29 @@ require_once __DIR__ . '/includes/navbar.php';
             <!-- Top Header & Cam kết thương hiệu -->
             <div class="relative z-10 space-y-6">
                 <!-- Logo Brand -->
-                <div class="flex items-center gap-3">
-                    <div class="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-inner">
-                        <i class="fa-solid fa-code text-lg"></i>
-                    </div>
+                <a href="<?= BASE_URL ?>/" class="flex items-center gap-3 group">
+                    <?php
+                    $authLogo = get_setting('site_logo', '');
+                    $authLogoUrl = '';
+                    if (!empty($authLogo)) {
+                        $authLogoPath = ROOT_PATH . '/' . ltrim($authLogo, '/');
+                        if (file_exists($authLogoPath) || preg_match('#^https?://#i', $authLogo)) {
+                            $authLogoUrl = preg_match('#^https?://#i', $authLogo) ? $authLogo : BASE_URL . '/' . ltrim($authLogo, '/');
+                        }
+                    }
+                    ?>
+                    <?php if (!empty($authLogoUrl)): ?>
+                        <img src="<?= htmlspecialchars($authLogoUrl) ?>" alt="Logo" class="w-11 h-11 rounded-2xl object-cover border border-white/20 shadow-inner group-hover:scale-105 transition-transform">
+                    <?php else: ?>
+                        <div class="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-inner group-hover:scale-105 transition-transform">
+                            <i class="fa-solid fa-code text-lg"></i>
+                        </div>
+                    <?php endif; ?>
                     <div>
                         <span class="text-xl font-black tracking-tight block">MARKET<span class="text-indigo-200">CODE</span></span>
                         <span class="text-[10px] font-semibold text-indigo-200/80 uppercase tracking-widest block -mt-0.5">SaaS Code Hub</span>
                     </div>
-                </div>
+                </a>
 
                 <!-- Tiêu đề & Giới thiệu -->
                 <div class="pt-2 space-y-2.5">

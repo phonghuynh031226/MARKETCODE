@@ -28,6 +28,21 @@ if ($user && $db) {
         $userNotifications = $nStmt->fetchAll();
     } catch (Exception $e) {}
 }
+$siteLogo = get_setting('site_logo', '');
+$logoUrl = '';
+$isWideLogo = false;
+if (!empty($siteLogo)) {
+    $logoPath = ROOT_PATH . '/' . ltrim($siteLogo, '/');
+    if (file_exists($logoPath) || preg_match('#^https?://#i', $siteLogo)) {
+        $logoUrl = preg_match('#^https?://#i', $siteLogo) ? $siteLogo : BASE_URL . '/' . ltrim($siteLogo, '/');
+        if (file_exists($logoPath)) {
+            $imgSize = @getimagesize($logoPath);
+            if ($imgSize && $imgSize[0] > $imgSize[1] * 1.8) {
+                $isWideLogo = true;
+            }
+        }
+    }
+}
 ?>
 <header class="sticky top-0 z-50 bg-white/85 backdrop-blur-xl border-b border-slate-200/80 transition-all duration-300">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -35,15 +50,29 @@ if ($user && $db) {
             <!-- Brand Logo -->
             <div class="flex items-center gap-8">
                 <a href="<?= BASE_URL ?>/" class="flex items-center gap-3 group">
-                    <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-300">
-                        <i class="fa-solid fa-code text-xl"></i>
-                    </div>
-                    <div class="flex flex-col">
-                        <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 bg-clip-text text-transparent">
-                            MARKET<span class="text-indigo-600">CODE</span>
-                        </span>
-                        <span class="text-[10px] tracking-widest font-semibold uppercase text-slate-500">Source Marketplace</span>
-                    </div>
+                    <?php if (!empty($logoUrl)): ?>
+                        <?php if ($isWideLogo): ?>
+                            <img src="<?= htmlspecialchars($logoUrl) ?>" alt="MarketCode Logo" class="h-10 sm:h-11 w-auto max-w-[200px] object-contain group-hover:scale-105 transition-transform duration-300">
+                        <?php else: ?>
+                            <img src="<?= htmlspecialchars($logoUrl) ?>" alt="MarketCode Logo" class="w-11 h-11 rounded-xl object-cover border border-slate-200/80 shadow-md shadow-indigo-500/10 group-hover:scale-105 transition-transform duration-300">
+                            <div class="flex flex-col">
+                                <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 bg-clip-text text-transparent">
+                                    MARKET<span class="text-indigo-600">CODE</span>
+                                </span>
+                                <span class="text-[10px] tracking-widest font-semibold uppercase text-slate-500">Source Marketplace</span>
+                            </div>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-300">
+                            <i class="fa-solid fa-code text-xl"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 bg-clip-text text-transparent">
+                                MARKET<span class="text-indigo-600">CODE</span>
+                            </span>
+                            <span class="text-[10px] tracking-widest font-semibold uppercase text-slate-500">Source Marketplace</span>
+                        </div>
+                    <?php endif; ?>
                 </a>
             </div>
 
