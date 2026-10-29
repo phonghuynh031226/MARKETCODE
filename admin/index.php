@@ -204,163 +204,162 @@ $totalChart7Days = array_sum($chartDataValues);
 </div>
 
 <!-- ===================================================== -->
-<!-- 2. BIỂU ĐỒ DOANH THU 7 NGÀY TOÀN BỀ NGANG (FULL-WIDTH) -->
+<!-- 2. BIỂU ĐỒ DOANH THU (BÊN TRÁI) & 2 BẢNG GIAO DỊCH (BÊN PHẢI) -->
 <!-- ===================================================== -->
-<div class="w-full bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm mb-6">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 mb-4 gap-3">
-        <div>
-            <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm shadow-2xs">
-                    <i class="fa-solid fa-chart-line"></i>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+    <!-- CỘT TRÁI: Biểu Đồ Doanh Thu 7 Ngày Gần Nhất (Col 6) -->
+    <div class="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm flex flex-col justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 mb-4 gap-3">
+            <div>
+                <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm shadow-2xs">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </span>
+                    <span>Biểu Đồ Doanh Thu 7 Ngày</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-1">Biến động nạp tiền tự động Ví MoMo &amp; Thẻ cào</p>
+            </div>
+            <div class="flex items-center gap-2 self-start sm:self-auto">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                    <i class="fa-solid fa-arrow-trend-up text-xs"></i>
+                    <span>+<?= number_format($totalChart7Days, 0, ',', '.') ?> đ</span>
                 </span>
-                <span>Biểu Đồ Doanh Thu 7 Ngày Gần Nhất</span>
-            </h3>
-            <p class="text-xs text-slate-400 mt-1">Biến động nạp tiền tự động qua Ví MoMo &amp; Thẻ cào toàn hệ thống</p>
-        </div>
-        <div class="flex items-center gap-2 self-start sm:self-auto">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
-                <i class="fa-solid fa-arrow-trend-up text-xs"></i>
-                <span>Tổng 7 ngày: +<?= number_format($totalChart7Days, 0, ',', '.') ?> đ</span>
-            </span>
-        </div>
-    </div>
-
-    <!-- Khung Canvas Chart.js Toàn Bề Ngang -->
-    <div class="relative w-full h-72 sm:h-80">
-        <canvas id="revenueChart"></canvas>
-    </div>
-</div>
-
-<!-- ===================================================== -->
-<!-- 3. 2 BẢNG GIAO DỊCH MỚI NHẤT (BỐ CỤC 2 CỘT CÂN ĐỐI)   -->
-<!-- ===================================================== -->
-<div class="w-full grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Bảng 1: Đơn Mua Mã Nguồn Mới (Cột Trái) -->
-    <div class="rounded-2xl bg-white border border-slate-200/80 shadow-sm overflow-hidden flex flex-col justify-between">
-        <div>
-            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <span class="w-6 h-6 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-xs shadow-2xs">
-                        <i class="fa-solid fa-bag-shopping"></i>
-                    </span>
-                    <span>Đơn Mua Mã Nguồn Mới</span>
-                </h3>
-                <a href="<?= BASE_URL ?>/admin/orders" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
-                    <span>Xem tất cả</span>
-                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
-                </a>
             </div>
-            <div class="w-full overflow-x-auto">
-                <table class="w-full min-w-[500px] text-left text-xs border-collapse">
-                    <thead>
-                        <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase bg-slate-50/30">
-                            <th class="py-2.5 px-3.5 whitespace-nowrap">Mã Đơn</th>
-                            <th class="py-2.5 px-3.5 whitespace-nowrap">Khách Hàng</th>
-                            <th class="py-2.5 px-3.5 min-w-[170px] whitespace-nowrap">Mã Nguồn</th>
-                            <th class="py-2.5 px-3.5 text-right whitespace-nowrap">Giá Mua</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <?php if (!empty($recentOrders)): ?>
-                            <?php foreach ($recentOrders as $ro): ?>
-                                <tr class="hover:bg-slate-50/70 transition-colors">
-                                    <td class="py-3 px-3.5 font-mono font-bold text-indigo-600 whitespace-nowrap">
-                                        #<?= xss_clean($ro['order_code']) ?>
-                                    </td>
-                                    <td class="py-3 px-3.5 text-slate-800 font-semibold whitespace-nowrap">
-                                        <?= xss_clean($ro['username']) ?>
-                                    </td>
-                                    <td class="py-3 px-3.5 text-slate-600 max-w-[170px] truncate" title="<?= xss_clean($ro['product_title']) ?>">
-                                        <?= xss_clean($ro['product_title']) ?>
-                                    </td>
-                                    <td class="py-3 px-3.5 font-extrabold text-slate-900 text-right whitespace-nowrap">
-                                        <?= number_format($ro['price'], 0, ',', '.') ?> đ
+        </div>
+
+        <!-- Khung Canvas Chart.js Chiều Cao Cân Đối Với 2 Bảng Bên Phải -->
+        <div class="relative w-full flex-1 min-h-[380px] sm:min-h-[440px]">
+            <canvas id="revenueChart"></canvas>
+        </div>
+    </div>
+
+    <!-- CỘT PHẢI: 2 BẢNG GIAO DỊCH MỚI NHẤT XẾP DỌC (Col 6) -->
+    <div class="lg:col-span-6 flex flex-col justify-between gap-6">
+        <!-- Bảng 1: Đơn Mua Mã Nguồn Mới -->
+        <div class="rounded-2xl bg-white border border-slate-200/80 shadow-sm overflow-hidden flex flex-col justify-between flex-1">
+            <div>
+                <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-xs shadow-2xs">
+                            <i class="fa-solid fa-bag-shopping"></i>
+                        </span>
+                        <span>Đơn Mua Mã Nguồn Mới</span>
+                    </h3>
+                    <a href="<?= BASE_URL ?>/admin/orders" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                        <span>Xem tất cả</span>
+                        <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                    </a>
+                </div>
+                <div class="w-full overflow-x-auto">
+                    <table class="w-full min-w-[460px] text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase bg-slate-50/30">
+                                <th class="py-2.5 px-3.5 whitespace-nowrap">Mã Đơn</th>
+                                <th class="py-2.5 px-3.5 whitespace-nowrap">Khách Hàng</th>
+                                <th class="py-2.5 px-3.5 min-w-[150px] whitespace-nowrap">Mã Nguồn</th>
+                                <th class="py-2.5 px-3.5 text-right whitespace-nowrap">Giá Mua</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <?php if (!empty($recentOrders)): ?>
+                                <?php foreach ($recentOrders as $ro): ?>
+                                    <tr class="hover:bg-slate-50/70 transition-colors">
+                                        <td class="py-2.5 px-3.5 font-mono font-bold text-indigo-600 whitespace-nowrap">
+                                            #<?= xss_clean($ro['order_code']) ?>
+                                        </td>
+                                        <td class="py-2.5 px-3.5 text-slate-800 font-semibold whitespace-nowrap">
+                                            <?= xss_clean($ro['username']) ?>
+                                        </td>
+                                        <td class="py-2.5 px-3.5 text-slate-600 max-w-[160px] truncate" title="<?= xss_clean($ro['product_title']) ?>">
+                                            <?= xss_clean($ro['product_title']) ?>
+                                        </td>
+                                        <td class="py-2.5 px-3.5 font-extrabold text-slate-900 text-right whitespace-nowrap">
+                                            <?= number_format($ro['price'], 0, ',', '.') ?> đ
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="4" class="py-6 text-center text-slate-400 space-y-1">
+                                        <i class="fa-solid fa-box-open text-lg text-slate-300 block"></i>
+                                        <span class="text-xs font-semibold block">Chưa có đơn hàng mua mã nguồn nào.</span>
                                     </td>
                                 </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <!-- Empty State Gọn Nhẹ -->
-                            <tr>
-                                <td colspan="4" class="py-8 text-center text-slate-400 space-y-1.5">
-                                    <i class="fa-solid fa-box-open text-xl text-slate-300 block"></i>
-                                    <span class="text-xs font-semibold block">Chưa có đơn hàng mua mã nguồn nào.</span>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Bảng 2: Giao Dịch Nạp Tiền Mới -->
-    <div class="rounded-2xl bg-white border border-slate-200/80 shadow-sm overflow-hidden flex flex-col justify-between">
-        <div>
-            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <span class="w-6 h-6 rounded-lg bg-pink-50 text-pink-600 flex items-center justify-center text-xs shadow-2xs">
-                        <i class="fa-solid fa-wallet"></i>
-                    </span>
-                    <span>Giao Dịch Nạp Tiền Mới</span>
-                </h3>
-                <a href="<?= BASE_URL ?>/admin/deposits" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
-                    <span>Xem tất cả</span>
-                    <i class="fa-solid fa-arrow-right text-[10px]"></i>
-                </a>
-            </div>
-            <div class="w-full overflow-x-auto">
-                <table class="w-full min-w-[500px] text-left text-xs border-collapse">
-                    <thead>
-                        <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase bg-slate-50/30">
-                            <th class="py-2.5 px-3.5 whitespace-nowrap">Mã GD</th>
-                            <th class="py-2.5 px-3.5 whitespace-nowrap">Kênh</th>
-                            <th class="py-2.5 px-3.5 whitespace-nowrap">Thành Viên</th>
-                            <th class="py-2.5 px-3.5 text-right whitespace-nowrap">Số Tiền</th>
-                            <th class="py-2.5 px-3.5 text-right whitespace-nowrap">Thời Gian</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <?php if (!empty($recentTransactions)): ?>
-                            <?php foreach ($recentTransactions as $rt): ?>
-                                <tr class="hover:bg-slate-50/70 transition-colors">
-                                    <td class="py-3 px-3.5 font-mono text-slate-500 whitespace-nowrap">
-                                        <?= xss_clean($rt['trans_id']) ?>
-                                    </td>
-                                    <td class="py-3 px-3.5 whitespace-nowrap">
-                                        <?php if ($rt['channel'] === 'MoMo' || $rt['channel'] === 'VietQR'): ?>
-                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-pink-50 text-pink-700 border border-pink-200">
-                                                <i class="fa-solid fa-wallet text-[8px]"></i>
-                                                Ví MoMo
-                                            </span>
-                                        <?php else: ?>
-                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                <i class="fa-solid fa-credit-card text-[8px]"></i>
-                                                Thẻ cào
-                                            </span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td class="py-3 px-3.5 text-slate-800 font-semibold whitespace-nowrap">
-                                        <?= xss_clean($rt['username']) ?>
-                                    </td>
-                                    <td class="py-3 px-3.5 font-extrabold text-emerald-600 text-right whitespace-nowrap">
-                                        +<?= number_format($rt['amount'], 0, ',', '.') ?> đ
-                                    </td>
-                                    <td class="py-3 px-3.5 text-slate-400 text-right whitespace-nowrap">
-                                        <?= date('H:i d/m', strtotime($rt['created_at'])) ?>
+        <!-- Bảng 2: Giao Dịch Nạp Tiền Mới -->
+        <div class="rounded-2xl bg-white border border-slate-200/80 shadow-sm overflow-hidden flex flex-col justify-between flex-1">
+            <div>
+                <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-lg bg-pink-50 text-pink-600 flex items-center justify-center text-xs shadow-2xs">
+                            <i class="fa-solid fa-wallet"></i>
+                        </span>
+                        <span>Giao Dịch Nạp Tiền Mới</span>
+                    </h3>
+                    <a href="<?= BASE_URL ?>/admin/deposits" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                        <span>Xem tất cả</span>
+                        <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                    </a>
+                </div>
+                <div class="w-full overflow-x-auto">
+                    <table class="w-full min-w-[460px] text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase bg-slate-50/30">
+                                <th class="py-2.5 px-3.5 whitespace-nowrap">Mã GD</th>
+                                <th class="py-2.5 px-3.5 whitespace-nowrap">Kênh</th>
+                                <th class="py-2.5 px-3.5 whitespace-nowrap">Thành Viên</th>
+                                <th class="py-2.5 px-3.5 text-right whitespace-nowrap">Số Tiền</th>
+                                <th class="py-2.5 px-3.5 text-right whitespace-nowrap">Thời Gian</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <?php if (!empty($recentTransactions)): ?>
+                                <?php foreach ($recentTransactions as $rt): ?>
+                                    <tr class="hover:bg-slate-50/70 transition-colors">
+                                        <td class="py-2.5 px-3.5 font-mono text-slate-500 whitespace-nowrap">
+                                            <?= xss_clean($rt['trans_id']) ?>
+                                        </td>
+                                        <td class="py-2.5 px-3.5 whitespace-nowrap">
+                                            <?php if ($rt['channel'] === 'MoMo' || $rt['channel'] === 'VietQR'): ?>
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-pink-50 text-pink-700 border border-pink-200">
+                                                    <i class="fa-solid fa-wallet text-[8px]"></i>
+                                                    MoMo
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                    <i class="fa-solid fa-credit-card text-[8px]"></i>
+                                                    Thẻ cào
+                                                </span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td class="py-2.5 px-3.5 text-slate-800 font-semibold whitespace-nowrap">
+                                            <?= xss_clean($rt['username']) ?>
+                                        </td>
+                                        <td class="py-2.5 px-3.5 font-extrabold text-emerald-600 text-right whitespace-nowrap">
+                                            +<?= number_format($rt['amount'], 0, ',', '.') ?> đ
+                                        </td>
+                                        <td class="py-2.5 px-3.5 text-slate-400 text-right whitespace-nowrap">
+                                            <?= date('H:i d/m', strtotime($rt['created_at'])) ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="5" class="py-6 text-center text-slate-400 space-y-1">
+                                        <i class="fa-solid fa-receipt text-lg text-slate-300 block"></i>
+                                        <span class="text-xs font-semibold block">Chưa có giao dịch nạp tiền nào.</span>
                                     </td>
                                 </tr>
-                            <?php endforeach; ?>
-                        <?php else: ?>
-                            <!-- Empty State Gọn Nhẹ -->
-                            <tr>
-                                <td colspan="5" class="py-8 text-center text-slate-400 space-y-1.5">
-                                    <i class="fa-solid fa-receipt text-xl text-slate-300 block"></i>
-                                    <span class="text-xs font-semibold block">Chưa có giao dịch nạp tiền Ví MoMo hay Thẻ cào nào.</span>
-                                </td>
-                            </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -375,7 +374,7 @@ $totalChart7Days = array_sum($chartDataValues);
         if (!chartCanvas) return;
 
         const ctx = chartCanvas.getContext('2d');
-        const gradient = ctx.createLinearGradient(0, 0, 0, 320);
+        const gradient = ctx.createLinearGradient(0, 0, 0, 420);
         gradient.addColorStop(0, 'rgba(79, 70, 229, 0.22)');
         gradient.addColorStop(1, 'rgba(79, 70, 229, 0.00)');
 
