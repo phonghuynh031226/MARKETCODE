@@ -142,20 +142,6 @@ if ($db) {
         </form>
     </div>
 
-    <!-- Thông báo -->
-    <?php if (!empty($message)): ?>
-        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-2 shadow-sm">
-            <i class="fa-solid fa-circle-check text-emerald-500"></i>
-            <span><?= xss_clean($message) ?></span>
-        </div>
-    <?php endif; ?>
-    <?php if (!empty($error)): ?>
-        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2 shadow-sm">
-            <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
-            <span><?= xss_clean($error) ?></span>
-        </div>
-    <?php endif; ?>
-
     <!-- Bảng thành viên -->
     <div class="rounded-3xl bg-white border border-slate-200/80 shadow-sm overflow-hidden">
         <div class="w-full overflow-x-auto">
@@ -256,24 +242,24 @@ if ($db) {
 
                                         <!-- Nút Khóa / Mở -->
                                         <?php if ($u['status'] === 'active'): ?>
-                                            <a href="<?= BASE_URL ?>/admin/users?user_id=<?= $u['id'] ?>&toggle_status=banned" onclick="return confirm('Bạn có chắc muốn KHÓA tài khoản này?')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold border border-rose-200/60 inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0">
+                                            <button type="button" onclick="openUserStatusModal(<?= $u['id'] ?>, '<?= addslashes($displayName) ?>', 'banned')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold border border-rose-200/60 inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0">
                                                 <i class="fa-solid fa-lock text-[10px]"></i><span>Khóa</span>
-                                            </a>
+                                            </button>
                                         <?php else: ?>
-                                            <a href="<?= BASE_URL ?>/admin/users?user_id=<?= $u['id'] ?>&toggle_status=active" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold border border-emerald-200/60 inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0">
+                                            <button type="button" onclick="openUserStatusModal(<?= $u['id'] ?>, '<?= addslashes($displayName) ?>', 'active')" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold border border-emerald-200/60 inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0">
                                                 <i class="fa-solid fa-lock-open text-[10px]"></i><span>Mở</span>
-                                            </a>
+                                            </button>
                                         <?php endif; ?>
 
                                         <!-- Nút Quyền Admin -->
                                         <?php if ($u['role'] === 'user'): ?>
-                                            <a href="<?= BASE_URL ?>/admin/users?user_id=<?= $u['id'] ?>&toggle_role=admin" onclick="return confirm('Cấp quyền Admin cho tài khoản này?')" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-purple-100 hover:text-purple-700 text-slate-600 text-xs font-semibold border border-slate-200/80 transition-colors inline-flex items-center justify-center cursor-pointer shrink-0" title="Cấp quyền Admin">
+                                            <button type="button" onclick="openUserStatusModal(<?= $u['id'] ?>, '<?= addslashes($displayName) ?>', 'admin')" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-purple-100 hover:text-purple-700 text-slate-600 text-xs font-semibold border border-slate-200/80 transition-colors inline-flex items-center justify-center cursor-pointer shrink-0" title="Cấp quyền Admin">
                                                 <i class="fa-solid fa-shield text-[11px]"></i>
-                                            </a>
+                                            </button>
                                         <?php else: ?>
-                                            <a href="<?= BASE_URL ?>/admin/users?user_id=<?= $u['id'] ?>&toggle_role=user" onclick="return confirm('Hạ quyền Admin về Member?')" class="w-7 h-7 rounded-lg bg-purple-50 hover:bg-amber-100 hover:text-amber-700 text-purple-700 text-xs font-semibold border border-purple-200/60 transition-colors inline-flex items-center justify-center cursor-pointer shrink-0" title="Hạ quyền Admin">
+                                            <button type="button" onclick="openUserStatusModal(<?= $u['id'] ?>, '<?= addslashes($displayName) ?>', 'user')" class="w-7 h-7 rounded-lg bg-purple-50 hover:bg-amber-100 hover:text-amber-700 text-purple-700 text-xs font-semibold border border-purple-200/60 transition-colors inline-flex items-center justify-center cursor-pointer shrink-0" title="Hạ quyền Admin">
                                                 <i class="fa-solid fa-user-minus text-[11px]"></i>
-                                            </a>
+                                            </button>
                                         <?php endif; ?>
                                     </div>
                                 </td>
@@ -288,47 +274,47 @@ if ($db) {
     </div>
 </div>
 
-<!-- MODAL CỘNG / TRỪ TIỀN THỦ CÔNG (Chuẩn SaaS Backdrop & Overlay) -->
-<div id="balanceModal" class="hidden fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto" style="z-index: 99999;" onclick="if (event.target === this) closeBalanceModal()">
-    <div class="max-h-[90vh] overflow-y-auto w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200/80 p-6 sm:p-8 relative">
+<!-- MODAL CỘNG / TRỪ TIỀN THỦ CÔNG (Chuẩn SaaS Backdrop & Overlay - Compact) -->
+<div id="balanceModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm overflow-y-auto" onclick="if (event.target === this) closeBalanceModal()">
+    <div class="max-h-[92vh] overflow-y-auto w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200/80 p-5 sm:p-6 my-auto relative">
         <!-- Modal Header -->
-        <div class="flex items-start justify-between pb-5 border-b border-slate-100 gap-4">
-            <div class="flex items-center gap-3.5">
-                <div class="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg shrink-0">
+        <div class="flex items-center justify-between pb-3.5 border-b border-slate-100 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-base shrink-0">
                     <i class="fa-solid fa-wallet"></i>
                 </div>
                 <div>
-                    <h3 class="text-lg font-black text-slate-900">Điều Chỉnh Số Dư</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Cộng hoặc trừ số dư ví của thành viên</p>
+                    <h3 class="text-base font-black text-slate-900">Điều Chỉnh Số Dư</h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Cộng hoặc trừ số dư ví của thành viên</p>
                 </div>
             </div>
-            <button type="button" onclick="closeBalanceModal()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shrink-0" title="Đóng (Esc)">
+            <button type="button" onclick="closeBalanceModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shrink-0" title="Đóng (Esc)">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
 
-        <form method="POST" action="" class="space-y-5 mt-6">
+        <form method="POST" action="" class="space-y-3 mt-4">
             <input type="hidden" name="action_adjust_balance" value="1">
             <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
             <input type="hidden" name="target_user_id" id="balUserId" value="0">
 
-            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
                 <div class="text-xs text-slate-500">Thành viên: <strong class="text-slate-900 font-bold" id="balUsername"></strong></div>
                 <div class="text-xs text-slate-500">Số dư hiện tại: <strong class="text-emerald-600 font-extrabold text-sm" id="balCurrent"></strong></div>
             </div>
 
             <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Loại Thao Tác</label>
-                <div class="grid grid-cols-2 gap-3">
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Loại Thao Tác</label>
+                <div class="grid grid-cols-2 gap-2.5">
                     <label class="cursor-pointer">
                         <input type="radio" name="adjust_type" value="add" checked class="peer sr-only">
-                        <div class="p-3.5 rounded-xl border-2 border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 text-center font-bold text-xs text-slate-600 peer-checked:text-emerald-700 transition-all">
+                        <div class="p-2.5 rounded-xl border-2 border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 text-center font-bold text-xs text-slate-600 peer-checked:text-emerald-700 transition-all">
                             <i class="fa-solid fa-plus mr-1"></i>Cộng Tiền (+)
                         </div>
                     </label>
                     <label class="cursor-pointer">
                         <input type="radio" name="adjust_type" value="sub" class="peer sr-only">
-                        <div class="p-3.5 rounded-xl border-2 border-slate-200 peer-checked:border-rose-500 peer-checked:bg-rose-50 text-center font-bold text-xs text-slate-600 peer-checked:text-rose-700 transition-all">
+                        <div class="p-2.5 rounded-xl border-2 border-slate-200 peer-checked:border-rose-500 peer-checked:bg-rose-50 text-center font-bold text-xs text-slate-600 peer-checked:text-rose-700 transition-all">
                             <i class="fa-solid fa-minus mr-1"></i>Trừ Tiền (-)
                         </div>
                     </label>
@@ -336,25 +322,57 @@ if ($db) {
             </div>
 
             <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Số Tiền (VND) *</label>
-                <input type="number" name="amount" required min="1000" step="1000" placeholder="Ví dụ: 100000" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Số Tiền (VND) *</label>
+                <input type="number" name="amount" required min="1000" step="1000" placeholder="Ví dụ: 100000" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
             </div>
 
             <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Lý Do Điều Chỉnh (Audit Log) *</label>
-                <input type="text" name="reason" required placeholder="Ví dụ: Nạp bù, khuyến mãi sự kiện, hoàn tiền..." class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Lý Do Điều Chỉnh (Audit Log) *</label>
+                <input type="text" name="reason" required placeholder="Ví dụ: Nạp bù, khuyến mãi sự kiện, hoàn tiền..." class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
             </div>
 
             <!-- Modal Footer -->
-            <div class="pt-5 border-t border-slate-100 flex items-center justify-end gap-3">
-                <button type="button" onclick="closeBalanceModal()" class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors">
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="closeBalanceModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors">
                     Hủy
                 </button>
-                <button type="submit" class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all">
-                    Xác Nhận Thực Hiện
+                <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-check text-[11px]"></i>
+                    <span>Xác Nhận Thực Hiện</span>
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- MODAL XÁC NHẬN KHÓA / MỞ KHÓA TÀI KHOẢN (Chuẩn SaaS) -->
+<div id="userStatusModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm overflow-y-auto" onclick="if (event.target === this) closeUserStatusModal()">
+    <div class="max-h-[90vh] overflow-y-auto w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200/80 p-6 sm:p-7 my-auto relative text-center">
+        <!-- Nút đóng -->
+        <button type="button" onclick="closeUserStatusModal()" class="absolute top-4 right-4 w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors" title="Đóng (Esc)">
+            <i class="fa-solid fa-xmark text-sm"></i>
+        </button>
+
+        <!-- Icon -->
+        <div id="statusModalIconBox" class="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center text-2xl mx-auto mb-4">
+            <i id="statusModalIcon" class="fa-solid fa-lock"></i>
+        </div>
+
+        <h3 id="statusModalTitle" class="text-lg font-black text-slate-900">Khóa Tài Khoản</h3>
+        <p id="statusModalDesc" class="text-xs text-slate-500 mt-2 leading-relaxed">
+            Bạn có chắc chắn muốn KHÓA tài khoản của thành viên này?
+        </p>
+
+        <!-- Modal Footer -->
+        <div class="mt-6 flex items-center justify-center gap-3">
+            <button type="button" onclick="closeUserStatusModal()" class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors">
+                Hủy Bỏ
+            </button>
+            <a id="statusModalConfirmBtn" href="#" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md shadow-rose-500/20 text-xs inline-flex items-center justify-center gap-1.5">
+                <i id="statusModalBtnIcon" class="fa-solid fa-lock text-xs"></i>
+                <span id="statusModalBtnText">Xác Nhận Khóa</span>
+            </a>
+        </div>
     </div>
 </div>
 
@@ -367,7 +385,78 @@ if ($db) {
         return modal;
     }
 
-    document.addEventListener('DOMContentLoaded', ensureBalanceModalInBody);
+    function ensureUserStatusModalInBody() {
+        var modal = document.getElementById('userStatusModal');
+        if (modal && modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+        return modal;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        ensureBalanceModalInBody();
+        ensureUserStatusModalInBody();
+    });
+
+    function openUserStatusModal(userId, username, actionType) {
+        var modal = ensureUserStatusModalInBody();
+        var titleEl = document.getElementById('statusModalTitle');
+        var descEl = document.getElementById('statusModalDesc');
+        var btn = document.getElementById('statusModalConfirmBtn');
+        var btnText = document.getElementById('statusModalBtnText');
+        var btnIcon = document.getElementById('statusModalBtnIcon');
+        var iconBox = document.getElementById('statusModalIconBox');
+        var icon = document.getElementById('statusModalIcon');
+
+        if (actionType === 'banned') {
+            titleEl.innerText = 'Khóa Tài Khoản';
+            descEl.innerHTML = 'Bạn có chắc chắn muốn <strong>KHÓA</strong> tài khoản của thành viên <span class="text-rose-600 font-bold">' + username + '</span>?<br>Tài khoản này sẽ bị tạm ngưng và không thể đăng nhập.';
+            iconBox.className = 'w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center text-2xl mx-auto mb-4';
+            icon.className = 'fa-solid fa-lock';
+            btn.className = 'bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md shadow-rose-500/20 text-xs inline-flex items-center justify-center gap-1.5';
+            btnIcon.className = 'fa-solid fa-lock text-xs';
+            btnText.innerText = 'Xác Nhận Khóa';
+            btn.href = '<?= BASE_URL ?>/admin/users?user_id=' + userId + '&toggle_status=banned';
+        } else if (actionType === 'active') {
+            titleEl.innerText = 'Mở Khóa Tài Khoản';
+            descEl.innerHTML = 'Bạn có chắc chắn muốn <strong>MỞ KHÓA</strong> tài khoản cho thành viên <span class="text-emerald-600 font-bold">' + username + '</span>?<br>Thành viên này sẽ có thể đăng nhập bình thường.';
+            iconBox.className = 'w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center text-2xl mx-auto mb-4';
+            icon.className = 'fa-solid fa-lock-open';
+            btn.className = 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md shadow-emerald-500/20 text-xs inline-flex items-center justify-center gap-1.5';
+            btnIcon.className = 'fa-solid fa-lock-open text-xs';
+            btnText.innerText = 'Xác Nhận Mở Khóa';
+            btn.href = '<?= BASE_URL ?>/admin/users?user_id=' + userId + '&toggle_status=active';
+        } else if (actionType === 'admin') {
+            titleEl.innerText = 'Cấp Quyền Admin';
+            descEl.innerHTML = 'Cấp quyền Quản trị viên (Admin) cho tài khoản <span class="text-purple-600 font-bold">' + username + '</span>?';
+            iconBox.className = 'w-14 h-14 rounded-2xl bg-purple-50 border border-purple-200 text-purple-600 flex items-center justify-center text-2xl mx-auto mb-4';
+            icon.className = 'fa-solid fa-shield';
+            btn.className = 'bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md shadow-purple-500/20 text-xs inline-flex items-center justify-center gap-1.5';
+            btnIcon.className = 'fa-solid fa-shield text-xs';
+            btnText.innerText = 'Xác Nhận Cấp Quyền';
+            btn.href = '<?= BASE_URL ?>/admin/users?user_id=' + userId + '&toggle_role=admin';
+        } else if (actionType === 'user') {
+            titleEl.innerText = 'Hạ Quyền Admin';
+            descEl.innerHTML = 'Hạ quyền Quản trị viên của <span class="text-amber-600 font-bold">' + username + '</span> về Thành viên (Member)?';
+            iconBox.className = 'w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center text-2xl mx-auto mb-4';
+            icon.className = 'fa-solid fa-user-minus';
+            btn.className = 'bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-6 rounded-xl transition-all shadow-md shadow-amber-500/20 text-xs inline-flex items-center justify-center gap-1.5';
+            btnIcon.className = 'fa-solid fa-user-minus text-xs';
+            btnText.innerText = 'Xác Nhận Hạ Quyền';
+            btn.href = '<?= BASE_URL ?>/admin/users?user_id=' + userId + '&toggle_role=user';
+        }
+
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+
+    function closeUserStatusModal() {
+        var modal = document.getElementById('userStatusModal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+        document.body.classList.remove('overflow-hidden');
+    }
 
     function openBalanceModal(userId, username, balance) {
         var modal = ensureBalanceModalInBody();
@@ -389,6 +478,7 @@ if ($db) {
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
             closeBalanceModal();
+            closeUserStatusModal();
         }
     });
 </script>

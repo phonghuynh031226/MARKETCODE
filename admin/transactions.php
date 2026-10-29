@@ -102,20 +102,6 @@ if ($db) {
         </div>
     </div>
 
-    <!-- Thông báo -->
-    <?php if (!empty($message)): ?>
-        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-2 shadow-sm">
-            <i class="fa-solid fa-circle-check text-emerald-500"></i>
-            <span><?= xss_clean($message) ?></span>
-        </div>
-    <?php endif; ?>
-    <?php if (!empty($error)): ?>
-        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2 shadow-sm">
-            <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
-            <span><?= xss_clean($error) ?></span>
-        </div>
-    <?php endif; ?>
-
     <!-- Tab Switcher -->
     <div class="flex rounded-2xl bg-slate-100 p-1.5 max-w-lg border border-slate-200">
         <a href="<?= BASE_URL ?>/admin/transactions?tab=card" class="flex-1 py-2.5 text-center text-xs sm:text-sm font-bold rounded-xl transition-all <?= $activeTab === 'card' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-600 hover:text-slate-900' ?>">
@@ -170,12 +156,12 @@ if ($db) {
                                     <td class="py-3 pr-4 pl-2 text-right whitespace-nowrap">
                                         <?php if ($c['status'] === 'pending'): ?>
                                             <div class="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
-                                                <a href="<?= BASE_URL ?>/admin/transactions?tab=card&approve_card_id=<?= $c['id'] ?>" onclick="return confirm('Xác nhận DUYỆT THẺ ĐÚNG và cộng tiền cho người dùng?')" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/60 font-semibold text-xs transition-colors inline-flex items-center gap-1 shrink-0" title="Duyệt thẻ thành công">
+                                                <button type="button" onclick="confirmAction('<?= BASE_URL ?>/admin/transactions?tab=card&approve_card_id=<?= $c['id'] ?>', { title: 'Duyệt Thẻ Đúng', text: 'Xác nhận duyệt thẻ đúng mệnh giá và cộng tiền tự động cho người dùng?', icon: 'question', confirmText: 'Duyệt & Cộng Tiền', confirmColor: '#10b981' })" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/60 font-semibold text-xs transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0" title="Duyệt thẻ thành công">
                                                     <i class="fa-solid fa-check text-[10px]"></i><span>Duyệt Đúng</span>
-                                                </a>
-                                                <a href="<?= BASE_URL ?>/admin/transactions?tab=card&reject_card_id=<?= $c['id'] ?>" onclick="return confirm('Xác nhận TỪ CHỐI THẺ này?')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/60 font-semibold text-xs transition-colors inline-flex items-center gap-1 shrink-0" title="Báo thẻ sai">
+                                                </button>
+                                                <button type="button" onclick="confirmAction('<?= BASE_URL ?>/admin/transactions?tab=card&reject_card_id=<?= $c['id'] ?>', { title: 'Từ Chối Thẻ Cào', text: 'Xác nhận báo thẻ sai và TỪ CHỐI thẻ cào này?', icon: 'warning', confirmText: 'Báo Thẻ Sai', isDanger: true })" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/60 font-semibold text-xs transition-colors inline-flex items-center gap-1 cursor-pointer shrink-0" title="Báo thẻ sai">
                                                     <i class="fa-solid fa-xmark text-[10px]"></i><span>Báo Sai</span>
-                                                </a>
+                                                </button>
                                             </div>
                                         <?php else: ?>
                                             <span class="text-xs text-slate-400">Đã duyệt</span>

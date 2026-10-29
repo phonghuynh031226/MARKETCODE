@@ -1,4 +1,13 @@
 <?php
+// Xóa bytecode cache và chống lưu cache trình duyệt
+if (function_exists('opcache_reset')) {
+    @opcache_reset();
+}
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+header("Expires: 0");
+
 // ========================================================
 // 1. FALLBACK DISPATCHER CHO CLEAN URLS TRONG ADMIN
 // Tự động phân phối đúng file con khi máy chủ trỏ vào admin/index.php
@@ -195,116 +204,38 @@ $totalChart7Days = array_sum($chartDataValues);
 </div>
 
 <!-- ===================================================== -->
-<!-- 2. BIỂU ĐỒ 7 NGÀY (8 CỘT) + LỐI TẮT QUẢN TRỊ (4 CỘT) -->
+<!-- 2. BIỂU ĐỒ DOANH THU 7 NGÀY TOÀN BỀ NGANG (FULL-WIDTH) -->
 <!-- ===================================================== -->
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6 items-stretch">
-    <!-- Cột Trái: Biểu Đồ Doanh Thu 7 Ngày Gần Nhất (Col 8) -->
-    <div class="lg:col-span-8 bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm flex flex-col justify-between">
-        <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 gap-3">
-            <div>
-                <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                    <span class="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs shadow-2xs">
-                        <i class="fa-solid fa-chart-line"></i>
-                    </span>
-                    <span>Biểu Đồ Doanh Thu 7 Ngày</span>
-                </h3>
-                <p class="text-xs text-slate-400 mt-0.5">Biến động nạp tiền tự động qua Ví MoMo &amp; Thẻ cào</p>
-            </div>
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs shrink-0">
-                <i class="fa-solid fa-arrow-trend-up text-[10px]"></i>
-                7 ngày: +<?= number_format($totalChart7Days, 0, ',', '.') ?> đ
-            </span>
+<div class="w-full bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 mb-4 gap-3">
+        <div>
+            <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                <span class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm shadow-2xs">
+                    <i class="fa-solid fa-chart-line"></i>
+                </span>
+                <span>Biểu Đồ Doanh Thu 7 Ngày Gần Nhất</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Biến động nạp tiền tự động qua Ví MoMo &amp; Thẻ cào toàn hệ thống</p>
         </div>
-
-        <!-- Khung Canvas Chart.js Chiều Cao Vừa Vặn -->
-        <div class="relative w-full h-64">
-            <canvas id="revenueChart"></canvas>
+        <div class="flex items-center gap-2 self-start sm:self-auto">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                <i class="fa-solid fa-arrow-trend-up text-xs"></i>
+                <span>Tổng 7 ngày: +<?= number_format($totalChart7Days, 0, ',', '.') ?> đ</span>
+            </span>
         </div>
     </div>
 
-    <!-- Cột Phải: Lối Tắt Quản Trị Nhanh & Trạng Thái Máy Chủ (Col 4) -->
-    <div class="lg:col-span-4 bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm flex flex-col justify-between space-y-4">
-        <div>
-            <div class="pb-3 border-b border-slate-100 mb-3">
-                <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                    <span class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xs shadow-2xs">
-                        <i class="fa-solid fa-bolt"></i>
-                    </span>
-                    <span>Lối Tắt Quản Trị</span>
-                </h3>
-                <p class="text-xs text-slate-400 mt-0.5">Truy cập nhanh tác vụ cốt lõi</p>
-            </div>
-
-            <!-- 4 Nút Lối Tắt Nhanh -->
-            <div class="space-y-2">
-                <a href="<?= BASE_URL ?>/admin/products" class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50/80 hover:text-indigo-600 border border-slate-200/70 transition-all font-bold text-xs text-slate-700 shadow-2xs group cursor-pointer">
-                    <div class="flex items-center gap-2.5">
-                        <span class="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-500 group-hover:text-indigo-600 group-hover:border-indigo-200 flex items-center justify-center text-[10px]">
-                            <i class="fa-solid fa-plus"></i>
-                        </span>
-                        <span>Đăng mã nguồn mới</span>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all"></i>
-                </a>
-
-                <a href="<?= BASE_URL ?>/admin/categories" class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50/80 hover:text-indigo-600 border border-slate-200/70 transition-all font-bold text-xs text-slate-700 shadow-2xs group cursor-pointer">
-                    <div class="flex items-center gap-2.5">
-                        <span class="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-500 group-hover:text-indigo-600 group-hover:border-indigo-200 flex items-center justify-center text-[10px]">
-                            <i class="fa-solid fa-layer-group"></i>
-                        </span>
-                        <span>Thêm danh mục mới</span>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all"></i>
-                </a>
-
-                <a href="<?= BASE_URL ?>/admin/deposits" class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50/80 hover:text-indigo-600 border border-slate-200/70 transition-all font-bold text-xs text-slate-700 shadow-2xs group cursor-pointer">
-                    <div class="flex items-center gap-2.5">
-                        <span class="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-500 group-hover:text-indigo-600 group-hover:border-indigo-200 flex items-center justify-center text-[10px]">
-                            <i class="fa-solid fa-money-bill-transfer"></i>
-                        </span>
-                        <span>Duyệt nạp tiền / Lịch sử</span>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all"></i>
-                </a>
-
-                <a href="<?= BASE_URL ?>/admin/settings" class="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-indigo-50/80 hover:text-indigo-600 border border-slate-200/70 transition-all font-bold text-xs text-slate-700 shadow-2xs group cursor-pointer">
-                    <div class="flex items-center gap-2.5">
-                        <span class="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-500 group-hover:text-indigo-600 group-hover:border-indigo-200 flex items-center justify-center text-[10px]">
-                            <i class="fa-solid fa-sliders"></i>
-                        </span>
-                        <span>Cấu hình hệ thống</span>
-                    </div>
-                    <i class="fa-solid fa-chevron-right text-[10px] text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all"></i>
-                </a>
-            </div>
-        </div>
-
-        <!-- Khung Trạng Thái Máy Chủ Nhỏ Gọn (Server Status) -->
-        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] space-y-1.5">
-            <div class="flex items-center justify-between text-slate-500 font-semibold">
-                <span class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Máy chủ trực tuyến
-                </span>
-                <span class="font-mono text-slate-700">PHP <?= PHP_MAJOR_VERSION ?>.<?= PHP_MINOR_VERSION ?></span>
-            </div>
-            <div class="flex items-center justify-between text-slate-400 pt-1 border-t border-slate-200/60 text-[10px]">
-                <span>CSDL MySQL (PDO)</span>
-                <span class="font-bold text-emerald-600">Đã kết nối</span>
-            </div>
-            <div class="flex items-center justify-between text-slate-400 text-[10px]">
-                <span>Giờ hệ thống</span>
-                <span class="font-mono text-slate-600"><?= date('H:i - d/m/Y') ?></span>
-            </div>
-        </div>
+    <!-- Khung Canvas Chart.js Toàn Bề Ngang -->
+    <div class="relative w-full h-72 sm:h-80">
+        <canvas id="revenueChart"></canvas>
     </div>
 </div>
 
 <!-- ===================================================== -->
-<!-- 3. 2 BẢNG GIAO DỊCH MỚI NHẤT (ĐƠN MUA & NẠP TIỀN)     -->
+<!-- 3. 2 BẢNG GIAO DỊCH MỚI NHẤT (BỐ CỤC 2 CỘT CÂN ĐỐI)   -->
 <!-- ===================================================== -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Bảng 1: Đơn Mua Mã Nguồn Mới -->
+<div class="w-full grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Bảng 1: Đơn Mua Mã Nguồn Mới (Cột Trái) -->
     <div class="rounded-2xl bg-white border border-slate-200/80 shadow-sm overflow-hidden flex flex-col justify-between">
         <div>
             <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
@@ -337,7 +268,7 @@ $totalChart7Days = array_sum($chartDataValues);
                                         #<?= xss_clean($ro['order_code']) ?>
                                     </td>
                                     <td class="py-3 px-3.5 text-slate-800 font-semibold whitespace-nowrap">
-                                        @<?= xss_clean($ro['username']) ?>
+                                        <?= xss_clean($ro['username']) ?>
                                     </td>
                                     <td class="py-3 px-3.5 text-slate-600 max-w-[170px] truncate" title="<?= xss_clean($ro['product_title']) ?>">
                                         <?= xss_clean($ro['product_title']) ?>
@@ -409,7 +340,7 @@ $totalChart7Days = array_sum($chartDataValues);
                                         <?php endif; ?>
                                     </td>
                                     <td class="py-3 px-3.5 text-slate-800 font-semibold whitespace-nowrap">
-                                        @<?= xss_clean($rt['username']) ?>
+                                        <?= xss_clean($rt['username']) ?>
                                     </td>
                                     <td class="py-3 px-3.5 font-extrabold text-emerald-600 text-right whitespace-nowrap">
                                         +<?= number_format($rt['amount'], 0, ',', '.') ?> đ
@@ -444,7 +375,7 @@ $totalChart7Days = array_sum($chartDataValues);
         if (!chartCanvas) return;
 
         const ctx = chartCanvas.getContext('2d');
-        const gradient = ctx.createLinearGradient(0, 0, 0, 260);
+        const gradient = ctx.createLinearGradient(0, 0, 0, 320);
         gradient.addColorStop(0, 'rgba(79, 70, 229, 0.22)');
         gradient.addColorStop(1, 'rgba(79, 70, 229, 0.00)');
 

@@ -88,20 +88,6 @@ if ($db) {
         </div>
     </div>
 
-    <!-- Thông báo -->
-    <?php if (!empty($message)): ?>
-        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-2 shadow-sm">
-            <i class="fa-solid fa-circle-check text-emerald-500"></i>
-            <span><?= xss_clean($message) ?></span>
-        </div>
-    <?php endif; ?>
-    <?php if (!empty($error)): ?>
-        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2 shadow-sm">
-            <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
-            <span><?= xss_clean($error) ?></span>
-        </div>
-    <?php endif; ?>
-
     <!-- Bảng đơn hàng -->
     <div class="rounded-3xl bg-white border border-slate-200/80 shadow-sm overflow-hidden">
         <div class="w-full overflow-x-auto">
@@ -153,9 +139,9 @@ if ($db) {
 
                                         <!-- Nút Hoàn tiền -->
                                         <?php if ($o['status'] === 'completed'): ?>
-                                            <a href="<?= BASE_URL ?>/admin/orders?refund_order_id=<?= $o['id'] ?>" onclick="return confirm('Xác nhận HOÀN TIỀN đơn hàng #<?= $o['order_code'] ?> cho khách hàng?')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-xs font-semibold text-rose-700 border border-rose-200/60 inline-flex items-center gap-1 transition-colors shrink-0" title="Hoàn lại tiền">
+                                            <button type="button" onclick="confirmAction('<?= BASE_URL ?>/admin/orders?refund_order_id=<?= $o['id'] ?>', { title: 'Hoàn Tiền Đơn Hàng', text: 'Xác nhận hoàn tiền cho đơn hàng #<?= $o['order_code'] ?>? Tiền sẽ được hoàn trả lại vào ví tài khoản của khách hàng.', icon: 'warning', confirmText: 'Đồng Ý Hoàn Tiền', isDanger: true })" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-xs font-semibold text-rose-700 border border-rose-200/60 inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0" title="Hoàn lại tiền">
                                                 <i class="fa-solid fa-rotate-left text-[10px]"></i><span>Hoàn Tiền</span>
-                                            </a>
+                                            </button>
                                         <?php endif; ?>
                                     </div>
                                 </td>

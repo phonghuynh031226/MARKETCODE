@@ -5,7 +5,7 @@ $adminCleanUri = rtrim($adminUri, '/');
 $currentAdminPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
 ?>
 <!-- SIDEBAR (Modern Clean Light) -->
-<aside class="w-64 bg-white border-r border-slate-200 flex flex-col justify-between hidden lg:flex sticky top-0 h-screen z-40 shadow-sm">
+<aside class="w-64 bg-white border-r border-slate-200 flex flex-col justify-between hidden lg:flex sticky top-0 h-screen shrink-0 z-40 shadow-sm">
     <div>
         <!-- Brand -->
         <div class="h-20 flex items-center px-6 border-b border-slate-200 gap-3">

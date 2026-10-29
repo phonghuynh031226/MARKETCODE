@@ -97,12 +97,32 @@ $currentAdminPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/animations.css?v=<?= filemtime(__DIR__ . '/../../assets/css/animations.css') ?>">
 
     <style>
+        html {
+            scroll-behavior: smooth;
+        }
         * {
             transition: background-color 0.15s ease, border-color 0.15s ease;
         }
-        /* Thanh cuộn ngang siêu mỏng & mượt mà cho bảng dữ liệu */
+        /* Thanh cuộn chính rõ nét, mượt mà và dễ kéo trên toàn trang admin */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f8fafc;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 9999px;
+            border: 2px solid #f8fafc;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* Thanh cuộn ngang siêu mỏng cho bảng dữ liệu */
         .overflow-x-auto::-webkit-scrollbar {
-            height: 5px;
+            height: 6px;
         }
         .overflow-x-auto::-webkit-scrollbar-track {
             background: #f1f5f9;
@@ -122,10 +142,10 @@ $currentAdminPage = basename($_SERVER['SCRIPT_NAME'] ?? '');
     <!-- SIDEBAR (Modular Clean Component) -->
     <?php require_once __DIR__ . '/sidebar.php'; ?>
 
-    <!-- MAIN CONTENT AREA -->
-    <div class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+    <!-- MAIN CONTENT AREA (Cuộn mượt mà tự nhiên theo toàn trang) -->
+    <div class="flex-1 flex flex-col min-w-0 min-h-screen">
         <!-- Top Navbar -->
-        <header class="h-20 bg-white/90 backdrop-blur-md border-b border-slate-200 px-6 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+        <header class="h-20 bg-white/90 backdrop-blur-md border-b border-slate-200 px-6 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-sm shrink-0">
             <div class="flex items-center gap-4">
                 <h2 class="text-lg font-black text-slate-900"><?= isset($pageTitle) ? xss_clean($pageTitle) : 'Admin Dashboard' ?></h2>
             </div>

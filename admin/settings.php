@@ -13,67 +13,116 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_settings'
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         $error = 'CSRF Token không hợp lệ!';
     } else {
-        $settingsToSave = [
-            // Cài đặt chung
-            'site_name'                  => trim($_POST['site_name'] ?? ''),
-            'site_logo'                  => trim($_POST['site_logo'] ?? ''),
-            'site_favicon'               => trim($_POST['site_favicon'] ?? ''),
-            'site_description'           => trim($_POST['site_description'] ?? ''),
-            'site_keywords'              => trim($_POST['site_keywords'] ?? ''),
-            'contact_hotline'            => trim($_POST['contact_hotline'] ?? ''),
-            'contact_email'              => trim($_POST['contact_email'] ?? ''),
-            'contact_telegram'           => trim($_POST['contact_telegram'] ?? ''),
-            'popup_enabled'              => isset($_POST['popup_enabled']) ? '1' : '0',
-            'popup_title'                => trim($_POST['popup_title'] ?? ''),
-            'popup_content'              => trim($_POST['popup_content'] ?? ''),
+        $uploadDir = (defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__)) . '/assets/images';
+        if (!is_dir($uploadDir)) {
+            @mkdir($uploadDir, 0777, true);
+        }
 
-            // MoMo Gateway credentials: blank fields preserve the saved value.
-            'momo_partner_code'          => trim($_POST['momo_partner_code'] ?? '') !== '' ? trim($_POST['momo_partner_code']) : get_setting('momo_partner_code', ''),
-            'momo_access_key'            => trim($_POST['momo_access_key'] ?? '') !== '' ? trim($_POST['momo_access_key']) : get_setting('momo_access_key', ''),
-            'momo_secret_key'            => trim($_POST['momo_secret_key'] ?? '') !== '' ? trim($_POST['momo_secret_key']) : get_setting('momo_secret_key', ''),
-            'momo_api_endpoint'           => trim($_POST['momo_api_endpoint'] ?? get_setting('momo_api_endpoint', 'https://payment.momo.vn/v2/gateway/api/create')),
-            // Cổng gạch thẻ
-            'card_api_url'               => trim($_POST['card_api_url'] ?? ''),
-            'card_partner_id'            => trim($_POST['card_partner_id'] ?? ''),
-            'card_partner_key'           => trim($_POST['card_partner_key'] ?? ''),
-
-            // OAuth Google
-            'oauth_google_client_id'      => trim($_POST['oauth_google_client_id'] ?? ''),
-            'oauth_google_client_secret'  => trim($_POST['oauth_google_client_secret'] ?? ''),
-            'oauth_google_redirect_uri'   => trim($_POST['oauth_google_redirect_uri'] ?? ''),
-
-            // OAuth Facebook
-            'oauth_facebook_app_id'       => trim($_POST['oauth_facebook_app_id'] ?? ''),
-            'oauth_facebook_app_secret'   => trim($_POST['oauth_facebook_app_secret'] ?? ''),
-            'oauth_facebook_redirect_uri' => trim($_POST['oauth_facebook_redirect_uri'] ?? ''),
-
-            // OAuth Zalo
-            'oauth_zalo_app_id'           => trim($_POST['oauth_zalo_app_id'] ?? ''),
-            'oauth_zalo_secret_key'       => trim($_POST['oauth_zalo_secret_key'] ?? ''),
-            'oauth_zalo_redirect_uri'     => trim($_POST['oauth_zalo_redirect_uri'] ?? ''),
-
-            // reCAPTCHA & Cron
-            'recaptcha_site_key'          => trim($_POST['recaptcha_site_key'] ?? ''),
-            'recaptcha_secret_key'        => trim($_POST['recaptcha_secret_key'] ?? ''),
-            'cron_security_key'           => trim($_POST['cron_security_key'] ?? '')
-        ];
-
-        try {
-            $db->beginTransaction();
-            foreach ($settingsToSave as $k => $v) {
-                // Loại bỏ localhost:8000 nếu lỡ nhập
-                if (str_contains($v, 'localhost:8000')) {
-                    $v = str_replace('http://localhost:8000', $current_domain, $v);
+        // Xử lý tải Logo mới nếu có
+        $newLogo = get_setting('site_logo', 'assets/images/logo.png');
+        if (!empty($_FILES['logo_file']['name']) && $_FILES['logo_file']['error'] === UPLOAD_ERR_OK) {
+            $allowedLogoExts = ['png', 'jpg', 'jpeg', 'webp', 'svg'];
+            $fileInfo = pathinfo($_FILES['logo_file']['name']);
+            $ext = strtolower($fileInfo['extension'] ?? '');
+            if (!in_array($ext, $allowedLogoExts)) {
+                $error = 'Định dạng Logo không hợp lệ! Vui lòng chọn .png, .svg, .webp hoặc .jpg';
+            } elseif ($_FILES['logo_file']['size'] > 5 * 1024 * 1024) {
+                $error = 'Kích thước file Logo vượt quá 5MB!';
+            } else {
+                $newFileName = 'logo_' . time() . '.' . $ext;
+                $destination = $uploadDir . '/' . $newFileName;
+                if (move_uploaded_file($_FILES['logo_file']['tmp_name'], $destination)) {
+                    $newLogo = 'assets/images/' . $newFileName;
+                } else {
+                    $error = 'Không thể lưu file Logo vào thư mục assets/images!';
                 }
-                update_setting($k, $v);
             }
-            $db->commit();
-            $message = 'Cập nhật toàn bộ cài đặt hệ thống thành công!';
-        } catch (Exception $e) {
-            if ($db->inTransaction()) {
-                $db->rollBack();
+        }
+
+        // Xử lý tải Favicon mới nếu có
+        $newFavicon = get_setting('site_favicon', 'assets/images/favicon.ico');
+        if (empty($error) && !empty($_FILES['favicon_file']['name']) && $_FILES['favicon_file']['error'] === UPLOAD_ERR_OK) {
+            $allowedFaviconExts = ['ico', 'png', 'svg'];
+            $fileInfo = pathinfo($_FILES['favicon_file']['name']);
+            $ext = strtolower($fileInfo['extension'] ?? '');
+            if (!in_array($ext, $allowedFaviconExts)) {
+                $error = 'Định dạng Favicon không hợp lệ! Vui lòng chọn .ico, .png hoặc .svg';
+            } elseif ($_FILES['favicon_file']['size'] > 2 * 1024 * 1024) {
+                $error = 'Kích thước file Favicon vượt quá 2MB!';
+            } else {
+                $newFileName = 'favicon_' . time() . '.' . $ext;
+                $destination = $uploadDir . '/' . $newFileName;
+                if (move_uploaded_file($_FILES['favicon_file']['tmp_name'], $destination)) {
+                    $newFavicon = 'assets/images/' . $newFileName;
+                } else {
+                    $error = 'Không thể lưu file Favicon vào thư mục assets/images!';
+                }
             }
-            $error = 'Lỗi lưu cài đặt: ' . $e->getMessage();
+        }
+
+        if (empty($error)) {
+            $settingsToSave = [
+                // Cài đặt chung
+                'site_name'                  => trim($_POST['site_name'] ?? ''),
+                'site_logo'                  => $newLogo,
+                'site_favicon'               => $newFavicon,
+                'site_description'           => trim($_POST['site_description'] ?? ''),
+                'site_keywords'              => trim($_POST['site_keywords'] ?? ''),
+                'contact_hotline'            => trim($_POST['contact_hotline'] ?? ''),
+                'contact_email'              => trim($_POST['contact_email'] ?? ''),
+                'contact_telegram'           => trim($_POST['contact_telegram'] ?? ''),
+                'popup_enabled'              => isset($_POST['popup_enabled']) ? '1' : '0',
+                'popup_title'                => trim($_POST['popup_title'] ?? ''),
+                'popup_content'              => trim($_POST['popup_content'] ?? ''),
+
+                // MoMo Gateway credentials: blank fields preserve the saved value.
+                'momo_partner_code'          => trim($_POST['momo_partner_code'] ?? '') !== '' ? trim($_POST['momo_partner_code']) : get_setting('momo_partner_code', ''),
+                'momo_access_key'            => trim($_POST['momo_access_key'] ?? '') !== '' ? trim($_POST['momo_access_key']) : get_setting('momo_access_key', ''),
+                'momo_secret_key'            => trim($_POST['momo_secret_key'] ?? '') !== '' ? trim($_POST['momo_secret_key']) : get_setting('momo_secret_key', ''),
+                'momo_api_endpoint'          => trim($_POST['momo_api_endpoint'] ?? get_setting('momo_api_endpoint', 'https://payment.momo.vn/v2/gateway/api/create')),
+                // Cổng gạch thẻ
+                'card_api_url'               => trim($_POST['card_api_url'] ?? ''),
+                'card_partner_id'            => trim($_POST['card_partner_id'] ?? ''),
+                'card_partner_key'           => trim($_POST['card_partner_key'] ?? ''),
+
+                // OAuth Google
+                'oauth_google_client_id'      => trim($_POST['oauth_google_client_id'] ?? ''),
+                'oauth_google_client_secret'  => trim($_POST['oauth_google_client_secret'] ?? ''),
+                'oauth_google_redirect_uri'   => trim($_POST['oauth_google_redirect_uri'] ?? ''),
+
+                // OAuth Facebook
+                'oauth_facebook_app_id'       => trim($_POST['oauth_facebook_app_id'] ?? ''),
+                'oauth_facebook_app_secret'   => trim($_POST['oauth_facebook_app_secret'] ?? ''),
+                'oauth_facebook_redirect_uri' => trim($_POST['oauth_facebook_redirect_uri'] ?? ''),
+
+                // OAuth Zalo
+                'oauth_zalo_app_id'           => trim($_POST['oauth_zalo_app_id'] ?? ''),
+                'oauth_zalo_secret_key'       => trim($_POST['oauth_zalo_secret_key'] ?? ''),
+                'oauth_zalo_redirect_uri'     => trim($_POST['oauth_zalo_redirect_uri'] ?? ''),
+
+                // reCAPTCHA & Cron
+                'recaptcha_site_key'          => trim($_POST['recaptcha_site_key'] ?? ''),
+                'recaptcha_secret_key'        => trim($_POST['recaptcha_secret_key'] ?? ''),
+                'cron_security_key'           => trim($_POST['cron_security_key'] ?? '')
+            ];
+
+            try {
+                $db->beginTransaction();
+                foreach ($settingsToSave as $k => $v) {
+                    // Loại bỏ localhost:8000 nếu lỡ nhập
+                    if (str_contains($v, 'localhost:8000')) {
+                        $v = str_replace('http://localhost:8000', $current_domain, $v);
+                    }
+                    update_setting($k, $v);
+                }
+                $db->commit();
+                $message = 'Cập nhật toàn bộ cài đặt hệ thống thành công!';
+            } catch (Exception $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                $error = 'Lỗi lưu cài đặt: ' . $e->getMessage();
+            }
         }
     }
 }
@@ -115,21 +164,7 @@ $cardCallbackUrl = $current_domain . '/api/callback_card.php';
         </div>
     </div>
 
-    <!-- Thông báo -->
-    <?php if (!empty($message)): ?>
-        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-2.5 shadow-sm">
-            <i class="fa-solid fa-circle-check text-emerald-500 text-base"></i>
-            <span><?= xss_clean($message) ?></span>
-        </div>
-    <?php endif; ?>
-    <?php if (!empty($error)): ?>
-        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2.5 shadow-sm">
-            <i class="fa-solid fa-triangle-exclamation text-rose-500 text-base"></i>
-            <span><?= xss_clean($error) ?></span>
-        </div>
-    <?php endif; ?>
-
-    <form method="POST" action="" class="space-y-6">
+    <form method="POST" action="" enctype="multipart/form-data" class="space-y-6">
         <input type="hidden" name="action_save_settings" value="1">
         <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
 
@@ -149,14 +184,41 @@ $cardCallbackUrl = $current_domain . '/api/callback_card.php';
                         <input type="text" name="site_name" value="<?= xss_clean(get_setting('site_name', 'MARKETCODE.VN - Sàn Giao Dịch Mã Nguồn')) ?>" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10">
                     </div>
 
+                    <?php
+                    $currentLogo = get_setting('site_logo', 'assets/images/logo.png');
+                    $currentLogoUrl = preg_match('#^https?://#i', $currentLogo) ? $currentLogo : BASE_URL . '/' . ltrim($currentLogo, '/');
+
+                    $currentFavicon = get_setting('site_favicon', 'assets/images/favicon.ico');
+                    $currentFaviconUrl = preg_match('#^https?://#i', $currentFavicon) ? $currentFavicon : BASE_URL . '/' . ltrim($currentFavicon, '/');
+                    ?>
+
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Tải Logo Website -->
                         <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Logo URL</label>
-                            <input type="text" name="site_logo" value="<?= xss_clean(get_setting('site_logo', 'assets/images/logo.png')) ?>" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10">
+                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Logo Website</label>
+                            <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                                <div class="w-16 h-12 rounded-lg bg-white border border-slate-200 p-1 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs" title="Logo hiện tại">
+                                    <img id="logoPreviewImg" src="<?= xss_clean($currentLogoUrl) ?>" alt="Logo Preview" onerror="this.onerror=null;this.src='https://placehold.co/120x60/e2e8f0/64748b?text=Logo';" class="max-h-full max-w-full object-contain">
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <label for="logoFileInput" class="block text-[11px] font-bold text-slate-600 mb-1">Tải Logo mới (.png, .svg)</label>
+                                    <input type="file" name="logo_file" id="logoFileInput" accept="image/png,image/svg+xml,image/jpeg,image/webp" onchange="previewLogo(this)" class="block w-full text-xs text-slate-500 file:mr-2.5 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- Tải Favicon Website -->
                         <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Favicon URL</label>
-                            <input type="text" name="site_favicon" value="<?= xss_clean(get_setting('site_favicon', 'assets/images/favicon.ico')) ?>" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10">
+                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Favicon Website</label>
+                            <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                                <div class="w-12 h-12 rounded-lg bg-white border border-slate-200 p-1.5 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs" title="Favicon hiện tại">
+                                    <img id="faviconPreviewImg" src="<?= xss_clean($currentFaviconUrl) ?>" alt="Favicon Preview" onerror="this.onerror=null;this.src='https://placehold.co/48x48/e2e8f0/64748b?text=ICO';" class="w-8 h-8 object-contain">
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <label for="faviconFileInput" class="block text-[11px] font-bold text-slate-600 mb-1">Tải Favicon mới (.ico, .png)</label>
+                                    <input type="file" name="favicon_file" id="faviconFileInput" accept="image/x-icon,image/png,image/svg+xml,image/vnd.microsoft.icon" onchange="previewFavicon(this)" class="block w-full text-xs text-slate-500 file:mr-2.5 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer">
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -407,6 +469,28 @@ $cardCallbackUrl = $current_domain . '/api/callback_card.php';
 </div>
 
 <script>
+    function previewLogo(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var img = document.getElementById('logoPreviewImg');
+                if (img) img.src = e.target.result;
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function previewFavicon(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var img = document.getElementById('faviconPreviewImg');
+                if (img) img.src = e.target.result;
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
     function copyText(str) {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(str).then(() => {

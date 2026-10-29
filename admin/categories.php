@@ -81,18 +81,6 @@ if ($db) {
         </button>
     </div>
 
-    <!-- Thông báo -->
-    <?php if (!empty($message)): ?>
-        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-2">
-            <i class="fa-solid fa-check"></i><span><?= xss_clean($message) ?></span>
-        </div>
-    <?php endif; ?>
-    <?php if (!empty($error)): ?>
-        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2">
-            <i class="fa-solid fa-triangle-exclamation"></i><span><?= xss_clean($error) ?></span>
-        </div>
-    <?php endif; ?>
-
     <!-- Bảng danh mục -->
     <div class="rounded-3xl bg-white border border-slate-200/80 shadow-sm overflow-hidden">
         <div class="w-full overflow-x-auto">
@@ -153,58 +141,58 @@ if ($db) {
     </div>
 </div>
 
-<!-- MODAL THÊM / SỬA DANH MỤC (Chuẩn SaaS Backdrop & Overlay) -->
-<div id="catModal" class="hidden fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto" style="z-index: 99999;" onclick="if (event.target === this) closeCatModal()">
-    <div class="max-h-[90vh] overflow-y-auto w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200/80 p-6 sm:p-8 relative">
+<!-- MODAL THÊM / SỬA DANH MỤC (Chuẩn SaaS Backdrop & Overlay - Phủ Kín Toàn Màn Hình) -->
+<div id="catModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm" onclick="if (event.target === this) closeCatModal()">
+    <div class="max-h-[92vh] overflow-y-auto w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200/80 p-5 sm:p-6 my-auto relative">
         <!-- Modal Header -->
-        <div class="flex items-start justify-between pb-5 border-b border-slate-100 gap-4">
-            <div class="flex items-center gap-3.5">
-                <div class="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg shrink-0">
+        <div class="flex items-center justify-between pb-3.5 border-b border-slate-100 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-base shrink-0">
                     <i class="fa-solid fa-layer-group"></i>
                 </div>
                 <div>
-                    <h3 class="text-lg font-black text-slate-900" id="modalTitle">Thêm Danh Mục Mới</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Thông tin danh mục phân loại mã nguồn</p>
+                    <h3 class="text-base font-black text-slate-900" id="modalTitle">Thêm Danh Mục Mới</h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Thông tin danh mục phân loại mã nguồn</p>
                 </div>
             </div>
-            <button type="button" onclick="closeCatModal()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shrink-0" title="Đóng (Esc)">
+            <button type="button" onclick="closeCatModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shrink-0" title="Đóng (Esc)">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
 
-        <form method="POST" action="" class="space-y-5 mt-6">
+        <form method="POST" action="" class="space-y-3 mt-4">
             <input type="hidden" name="action_save" value="1">
             <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
             <input type="hidden" name="category_id" id="catId" value="0">
 
             <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Tên Danh Mục *</label>
-                <input type="text" name="name" id="catName" required placeholder="Ví dụ: PHP & Laravel, Game Unity, Flutter App..." class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Tên Danh Mục *</label>
+                <input type="text" name="name" id="catName" required placeholder="Ví dụ: PHP & Laravel, Game Unity, Flutter App..." class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Đường Dẫn (Slug)</label>
-                    <input type="text" name="slug" id="catSlug" placeholder="Tự động tạo nếu để trống" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Đường Dẫn (Slug)</label>
+                    <input type="text" name="slug" id="catSlug" placeholder="Tự động tạo nếu để trống" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-mono text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
                 </div>
                 <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">FontAwesome Icon Class</label>
-                    <input type="text" name="icon" id="catIcon" value="fa-brands fa-php" placeholder="fa-brands fa-php" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">FontAwesome Icon</label>
+                    <input type="text" name="icon" id="catIcon" value="fa-brands fa-php" placeholder="fa-brands fa-php" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-mono text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
                 </div>
             </div>
 
             <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Mô Tả Ngắn</label>
-                <textarea name="description" id="catDesc" rows="3" placeholder="Mô tả tóm tắt về loại mã nguồn trong danh mục này..." class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"></textarea>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Mô Tả Ngắn</label>
+                <textarea name="description" id="catDesc" rows="2" placeholder="Mô tả tóm tắt về loại mã nguồn trong danh mục này..." class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"></textarea>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
                 <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Thứ Tự Sắp Xếp</label>
-                    <input type="number" name="sort_order" id="catSort" value="0" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Thứ Tự Sắp Xếp</label>
+                    <input type="number" name="sort_order" id="catSort" value="0" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:bg-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
                 </div>
-                <div class="pt-2 sm:pt-6">
-                    <label class="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-slate-700 select-none">
+                <div class="pt-1 sm:pt-4">
+                    <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 select-none">
                         <input type="checkbox" name="status" id="catStatus" checked class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300">
                         <span>Hiển thị danh mục ra ngoài</span>
                     </label>
@@ -212,12 +200,13 @@ if ($db) {
             </div>
 
             <!-- Modal Footer -->
-            <div class="pt-5 border-t border-slate-100 flex items-center justify-end gap-3">
-                <button type="button" onclick="closeCatModal()" class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors">
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="closeCatModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors">
                     Hủy
                 </button>
-                <button type="submit" class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/25 transition-all">
-                    Lưu Danh Mục
+                <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/25 transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-floppy-disk text-[11px]"></i>
+                    <span>Lưu Danh Mục</span>
                 </button>
             </div>
         </form>
@@ -278,18 +267,12 @@ if ($db) {
     });
 
     function confirmDeleteCat(id, name) {
-        Swal.fire({
-            title: 'Xác Nhận Xóa Danh Mục',
-            text: `Bạn có chắc muốn xóa danh mục "${name}"?`,
+        confirmAction('<?= BASE_URL ?>/admin/categories?delete_id=' + id, {
+            title: 'Xóa Danh Mục',
+            text: `Bạn có chắc chắn muốn xóa danh mục "${name}"? Các sản phẩm thuộc danh mục này có thể bị ảnh hưởng.`,
             icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Đồng ý xóa',
-            cancelButtonText: 'Hủy bỏ',
-            confirmButtonColor: '#e11d48'
-        }).then((res) => {
-            if (res.isConfirmed) {
-                window.location.href = '<?= BASE_URL ?>/admin/categories?delete_id=' + id;
-            }
+            confirmText: 'Đồng Ý Xóa',
+            isDanger: true
         });
     }
 </script>

@@ -5,6 +5,13 @@ $clientId     = get_setting('oauth_google_client_id', '');
 $clientSecret = get_setting('oauth_google_client_secret', '');
 $redirectUri  = get_setting('oauth_google_redirect_uri', BASE_URL . '/auth/google.php');
 
+// Chuẩn hóa Redirect URI thành đường dẫn tuyệt đối bắt buộc theo chuẩn Google OAuth 2.0
+if (empty($redirectUri)) {
+    $redirectUri = BASE_URL . '/auth/google.php';
+} elseif (!preg_match('#^https?://#i', $redirectUri)) {
+    $redirectUri = BASE_URL . '/' . ltrim($redirectUri, '/');
+}
+
 // Nếu chưa cấu hình OAuth Google, thông báo hướng dẫn
 if (empty($clientId) || empty($clientSecret)) {
     die('<!DOCTYPE html>

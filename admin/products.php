@@ -36,15 +36,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_product']
         $content      = trim($_POST['content'] ?? '');
         $price        = (float)($_POST['price'] ?? 0);
         $salePrice    = !empty($_POST['sale_price']) ? (float)$_POST['sale_price'] : null;
-        $thumbnail    = trim($_POST['thumbnail'] ?? '');
         $demoUrl      = trim($_POST['demo_url'] ?? '');
         $downloadUrl  = trim($_POST['download_url'] ?? '');
         $status       = in_array($_POST['status'] ?? '', ['active', 'hidden', 'draft']) ? $_POST['status'] : 'active';
 
-        // Xử lý Danh Sách Ảnh Phụ Demo (Upload Trực Tiếp từ Máy & Giữ Ảnh Cũ)
+        // Xử lý Danh Sách Ảnh Sản Phẩm (Tối đa 5 ảnh: Ảnh 1 là Thumbnail, Ảnh 2-5 là Ảnh phụ)
         $finalGallery = [];
 
-        // 1. Giữ lại các ảnh phụ cũ đã có (nếu chỉnh sửa sản phẩm)
+        // 1. Giữ lại các ảnh cũ đã có (nếu chỉnh sửa sản phẩm)
         if (!empty($_POST['existing_gallery']) && is_array($_POST['existing_gallery'])) {
             foreach ($_POST['existing_gallery'] as $oldImg) {
                 $oldImg = trim($oldImg);
@@ -54,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_product']
             }
         }
 
-        // 2. Upload các file ảnh phụ mới được chọn từ máy tính
+        // 2. Upload các file ảnh mới được chọn từ máy tính
         if (!empty($_FILES['secondary_images']['name']) && is_array($_FILES['secondary_images']['name'])) {
             $uploadDir = ROOT_PATH . '/assets/uploads/products';
             if (!is_dir($uploadDir)) {
@@ -65,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_product']
             $fileCount = count($_FILES['secondary_images']['name']);
 
             for ($i = 0; $i < $fileCount; $i++) {
-                // Tối đa 5 ảnh phụ tổng cộng
+                // Tối đa 5 ảnh tổng cộng
                 if (count($finalGallery) >= 5) {
                     break;
                 }
@@ -90,7 +89,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_product']
             }
         }
 
-        $galleryJson = !empty($finalGallery) ? json_encode(array_values($finalGallery), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null;
+        // Ảnh số 1 tự động làm thumbnail, các ảnh còn lại làm gallery (ảnh phụ)
+        $thumbnail = 'assets/images/default-thumbnail.jpg';
+        $secondaryImages = [];
+        if (!empty($finalGallery)) {
+            $thumbnail = $finalGallery[0];
+            $secondaryImages = array_slice($finalGallery, 1);
+        }
+        $galleryJson = !empty($secondaryImages) ? json_encode(array_values($secondaryImages), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null;
 
         if (empty($slug)) {
             $slug = slugify($title);
@@ -205,20 +211,6 @@ if ($db) {
             <span>Đăng Bán Mã Nguồn Mới</span>
         </button>
     </div>
-
-    <!-- Thông báo Alert -->
-    <?php if (!empty($message)): ?>
-        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-2 shadow-sm">
-            <i class="fa-solid fa-circle-check text-emerald-500"></i>
-            <span><?= xss_clean($message) ?></span>
-        </div>
-    <?php endif; ?>
-    <?php if (!empty($error)): ?>
-        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2 shadow-sm">
-            <i class="fa-solid fa-triangle-exclamation text-rose-500"></i>
-            <span><?= xss_clean($error) ?></span>
-        </div>
-    <?php endif; ?>
 
     <!-- THANH CÔNG CỤ NHANH: TÌM KIẾM, LỌC & THỐNG KÊ -->
     <div class="rounded-2xl bg-white p-3.5 sm:p-4 border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -396,129 +388,126 @@ if ($db) {
     </div>
 </div>
 
-<!-- MODAL THÊM / SỬA MÃ NGUỒN (Chuẩn SaaS Backdrop & Overlay) -->
-<div id="productModal" class="hidden fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm overflow-y-auto" style="z-index: 99999;" onclick="if (event.target === this) closeProductModal()">
-    <div class="max-h-[90vh] overflow-y-auto w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200/80 p-6 sm:p-8 relative">
+<!-- MODAL THÊM / SỬA MÃ NGUỒN (Chuẩn SaaS Backdrop & Overlay - No-scroll Compact Modal) -->
+<div id="productModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm overflow-y-auto" onclick="if (event.target === this) closeProductModal()">
+    <div class="max-h-[92vh] overflow-y-auto w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200/80 p-5 sm:p-6 my-auto relative">
         <!-- Modal Header -->
-        <div class="flex items-start justify-between pb-5 border-b border-slate-100 gap-4">
-            <div class="flex items-center gap-3.5">
-                <div class="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-lg shrink-0">
+        <div class="flex items-center justify-between pb-3.5 border-b border-slate-100 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-base shrink-0">
                     <i class="fa-solid fa-code"></i>
                 </div>
                 <div>
-                    <h3 class="text-lg font-black text-slate-900" id="pModalTitle">Đăng Bán Mã Nguồn Mới</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Điền thông tin và liên kết tải mã nguồn</p>
+                    <h3 class="text-base font-black text-slate-900" id="pModalTitle">Đăng Bán Mã Nguồn Mới</h3>
+                    <p class="text-[11px] text-slate-400 mt-0.5">Điền thông tin và liên kết tải mã nguồn</p>
                 </div>
             </div>
-            <button type="button" onclick="closeProductModal()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shrink-0" title="Đóng (Esc)">
+            <button type="button" onclick="closeProductModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors shrink-0" title="Đóng (Esc)">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
 
-        <!-- Modal Form -->
-        <form method="POST" action="" enctype="multipart/form-data" class="space-y-5 mt-6">
+        <!-- Modal Form (Bố Cục 2 Cột Cân Đối Compact Trọn Vẹn 1 Màn Hình) -->
+        <form method="POST" action="" enctype="multipart/form-data" class="mt-4 space-y-3">
             <input type="hidden" name="action_save_product" value="1">
             <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
             <input type="hidden" name="product_id" id="prodId" value="0">
 
-            <!-- Tên mã nguồn -->
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Tên Mã Nguồn *</label>
-                <input type="text" name="title" id="prodTitle" required placeholder="Nhập tên mã nguồn đầy đủ..." class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
-            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-3">
+                <!-- CỘT TRÁI: THÔNG TIN CƠ BẢN, GIÁ & LINK TẢI -->
+                <div class="space-y-3">
+                    <!-- Tên mã nguồn -->
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Tên Mã Nguồn *</label>
+                        <input type="text" name="title" id="prodTitle" required placeholder="Nhập tên mã nguồn đầy đủ..." class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all">
+                    </div>
 
-            <!-- Danh mục & Trạng thái -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Danh Mục *</label>
-                    <select name="category_id" id="prodCatId" required class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
-                        <?php foreach ($categories as $c): ?>
-                            <option value="<?= $c['id'] ?>"><?= xss_clean($c['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Trạng Thái *</label>
-                    <select name="status" id="prodStatus" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
-                        <option value="active">Đang Bán (Active)</option>
-                        <option value="hidden">Đang Ẩn (Hidden)</option>
-                        <option value="draft">Bản Nháp (Draft)</option>
-                    </select>
-                </div>
-            </div>
+                    <!-- Danh mục & Trạng thái -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Danh Mục *</label>
+                            <select name="category_id" id="prodCatId" required class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
+                                <?php foreach ($categories as $c): ?>
+                                    <option value="<?= $c['id'] ?>"><?= xss_clean($c['name']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Trạng Thái *</label>
+                            <select name="status" id="prodStatus" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
+                                <option value="active">Đang Bán (Active)</option>
+                                <option value="hidden">Đang Ẩn (Hidden)</option>
+                                <option value="draft">Bản Nháp (Draft)</option>
+                            </select>
+                        </div>
+                    </div>
 
-            <!-- Hàng Giá -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Giá Gốc (VND) *</label>
-                    <input type="number" name="price" id="prodPrice" required placeholder="500000" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Giá Khuyến Mãi (Nếu có)</label>
-                    <input type="number" name="sale_price" id="prodSalePrice" placeholder="350000" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
-                </div>
-            </div>
+                    <!-- Hàng Giá -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Giá Gốc (VND) *</label>
+                            <input type="number" name="price" id="prodPrice" required placeholder="500000" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Giá Khuyến Mãi</label>
+                            <input type="number" name="sale_price" id="prodSalePrice" placeholder="350000" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
+                        </div>
+                    </div>
 
-            <!-- Thumbnail & Demo URL -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Ảnh Thumbnail (URL)</label>
-                    <input type="url" name="thumbnail" id="prodThumbnail" placeholder="https://..." class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
+                    <!-- Link Xem Live Demo (Tùy Chọn) -->
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Link Xem Live Demo (Tùy Chọn)</label>
+                        <input type="url" name="demo_url" id="prodDemoUrl" placeholder="https://demo.example.com (không bắt buộc)..." class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
+                    </div>
+
+                    <!-- Link tải source code -->
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Link Tải Source Code (Drive / Mega) *</label>
+                        <input type="text" name="download_url" id="prodDownloadUrl" required placeholder="https://drive.google.com/..." class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Link Xem Live Demo (URL)</label>
-                    <input type="url" name="demo_url" id="prodDemoUrl" placeholder="https://demo..." class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
+
+                <!-- CỘT PHẢI: ẢNH PHỤ DEMO, MÔ TẢ & HƯỚNG DẪN -->
+                <div class="space-y-3 flex flex-col justify-between">
+                    <!-- Chọn Ảnh Bộ Sưu Tập & Thumbnail Thông Minh -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                                <i class="fa-regular fa-images text-purple-600"></i>
+                                <span>Bộ Sưu Tập Ảnh Sản Phẩm (Tối đa 5 ảnh)</span>
+                            </label>
+                            <span id="secondaryImagesCount" class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">0/5 ảnh</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mb-1.5 leading-tight">Ảnh số 1 sẽ tự động làm <strong class="text-purple-600">⭐ Ảnh chính (Thumbnail)</strong>. Ảnh 2-5 là ảnh phụ.</p>
+                        
+                        <input type="file" name="secondary_images[]" id="secondaryImagesInput" accept="image/jpeg,image/png,image/webp,image/gif" multiple max="5" class="block w-full text-[11px] text-slate-500 file:mr-2.5 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100 file:cursor-pointer cursor-pointer border border-slate-200 rounded-xl bg-slate-50 focus:outline-none transition-all">
+
+                        <!-- Lưới Xem Trước Ảnh Thu Nhỏ -->
+                        <div id="secondaryImagesPreviewGrid" class="grid grid-cols-5 gap-1.5 mt-1.5 hidden"></div>
+                    </div>
+
+                    <!-- Mô tả ngắn -->
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Mô Tả Ngắn</label>
+                        <textarea name="short_desc" id="prodShortDesc" rows="2" placeholder="Tóm tắt tính năng chính của mã nguồn..." class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all"></textarea>
+                    </div>
+
+                    <!-- Nội dung chi tiết & Hướng dẫn cài đặt -->
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Nội Dung Chi Tiết (HTML)</label>
+                        <textarea name="content" id="prodContent" rows="3" placeholder="<p>Hướng dẫn cài đặt và cấu hình database...</p>" class="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all"></textarea>
+                    </div>
                 </div>
-            </div>
-
-            <!-- Chọn Ảnh Phụ Demo Tải Lên Trực Tiếp (Tối đa 5 ảnh) -->
-            <div>
-                <div class="flex items-center justify-between mb-2">
-                    <label class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                        <i class="fa-regular fa-images text-indigo-600"></i>
-                        <span>Ảnh Phụ Demo Tải Lên (Tối đa 5 ảnh)</span>
-                    </label>
-                    <span id="secondaryImagesCount" class="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">0/5 ảnh</span>
-                </div>
-                
-                <div class="relative">
-                    <input type="file" name="secondary_images[]" id="secondaryImagesInput" accept="image/jpeg,image/png,image/webp,image/gif" multiple max="5" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 file:cursor-pointer cursor-pointer border border-slate-200 rounded-xl bg-slate-50 focus:outline-none transition-all">
-                </div>
-                <p class="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
-                    <i class="fa-solid fa-circle-info text-indigo-500"></i>
-                    <span>Chọn tối đa 5 ảnh phụ demo (.jpg, .png, .webp). Khung preview sẽ hiển thị ngay bên dưới.</span>
-                </p>
-
-                <!-- Lưới Xem Trước Ảnh Phụ Thu Nhỏ (Instant Multi-Image Preview Grid) -->
-                <div id="secondaryImagesPreviewGrid" class="grid grid-cols-5 gap-2 mt-2.5 hidden"></div>
-            </div>
-
-            <!-- Link tải source code -->
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Link Tải Source Code (Google Drive / Mega / Host) *</label>
-                <input type="text" name="download_url" id="prodDownloadUrl" required placeholder="https://drive.google.com/..." class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all">
-                <span class="text-[11px] text-slate-400 mt-1 block">Khách hàng chỉ nhận được link này sau khi hoàn tất mua hàng.</span>
-            </div>
-
-            <!-- Mô tả ngắn -->
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Mô Tả Ngắn</label>
-                <textarea name="short_desc" id="prodShortDesc" rows="2" placeholder="Tóm tắt tính năng chính của mã nguồn..." class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all"></textarea>
-            </div>
-
-            <!-- Nội dung chi tiết & Hướng dẫn cài đặt -->
-            <div>
-                <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Nội Dung Chi Tiết &amp; Hướng Dẫn Cài Đặt (HTML)</label>
-                <textarea name="content" id="prodContent" rows="5" placeholder="<p>Hướng dẫn cài đặt và cấu hình database...</p>" class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all"></textarea>
             </div>
 
             <!-- Modal Footer -->
-            <div class="pt-5 border-t border-slate-100 flex items-center justify-end gap-3">
-                <button type="button" onclick="closeProductModal()" class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors">
+            <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="closeProductModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors">
                     Hủy
                 </button>
-                <button type="submit" class="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all">
-                    Lưu Mã Nguồn
+                <button type="submit" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition-all flex items-center gap-1.5">
+                    <i class="fa-solid fa-floppy-disk text-[11px]"></i>
+                    <span>Lưu Mã Nguồn</span>
                 </button>
             </div>
         </form>
@@ -633,37 +622,58 @@ if ($db) {
         }
 
         grid.innerHTML = '';
+        let overallIdx = 0;
 
-        // 1. Hiển thị các ảnh phụ đã có sẵn
+        // 1. Hiển thị các ảnh đã có sẵn
         existingSecondaryImages.forEach((imgUrl, idx) => {
             let displayUrl = imgUrl;
             if (!displayUrl.startsWith('http') && !displayUrl.startsWith('/') && !displayUrl.startsWith('data:')) {
                 displayUrl = '<?= BASE_URL ?>/' + displayUrl;
             }
+            const isMain = (overallIdx === 0);
+            overallIdx++;
+
             const item = document.createElement('div');
-            item.className = 'relative group aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs';
+            item.className = isMain 
+                ? 'relative group aspect-square rounded-xl overflow-hidden border-2 border-purple-600 ring-2 ring-purple-500/20 bg-purple-50/20 shadow-xs'
+                : 'relative group aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs';
+
+            const badgeHtml = isMain 
+                ? `<span class="absolute bottom-0.5 inset-x-0.5 py-0.5 rounded text-[7.5px] font-extrabold bg-purple-600 text-white text-center leading-tight shadow-xs truncate">⭐ Ảnh chính (Thumbnail)</span>`
+                : `<span class="absolute bottom-0.5 left-0.5 px-1 py-0.2 rounded text-[7.5px] font-bold bg-slate-900/75 text-white leading-tight">Ảnh phụ</span>`;
+
             item.innerHTML = `
-                <img src="${displayUrl}" alt="Ảnh cũ ${idx + 1}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/100x100/f1f5f9/64748b?text=IMG'">
+                <img src="${displayUrl}" alt="Ảnh ${overallIdx}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/100x100/f1f5f9/64748b?text=IMG'">
                 <input type="hidden" name="existing_gallery[]" value="${imgUrl}">
                 <button type="button" onclick="removeExistingSecondaryImage(${idx})" class="absolute top-1 right-1 w-5 h-5 rounded-md bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center text-[9px] shadow-sm transition-all cursor-pointer opacity-90 hover:opacity-100" title="Xóa ảnh này">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
-                <span class="absolute bottom-1 left-1 px-1 py-0.2 rounded text-[8px] font-bold bg-slate-900/75 text-white">Ảnh cũ</span>
+                ${badgeHtml}
             `;
             grid.appendChild(item);
         });
 
-        // 2. Hiển thị các ảnh phụ mới được chọn từ máy tính
+        // 2. Hiển thị các ảnh mới được chọn từ máy tính
         selectedSecondaryFiles.forEach((file, idx) => {
             const objectUrl = URL.createObjectURL(file);
+            const isMain = (overallIdx === 0);
+            overallIdx++;
+
             const item = document.createElement('div');
-            item.className = 'relative group aspect-square rounded-xl overflow-hidden border-2 border-indigo-400 bg-indigo-50/20 shadow-2xs';
+            item.className = isMain 
+                ? 'relative group aspect-square rounded-xl overflow-hidden border-2 border-purple-600 ring-2 ring-purple-500/20 bg-purple-50/20 shadow-xs'
+                : 'relative group aspect-square rounded-xl overflow-hidden border-2 border-indigo-300 bg-indigo-50/20 shadow-2xs';
+
+            const badgeHtml = isMain 
+                ? `<span class="absolute bottom-0.5 inset-x-0.5 py-0.5 rounded text-[7.5px] font-extrabold bg-purple-600 text-white text-center leading-tight shadow-xs truncate">⭐ Ảnh chính (Thumbnail)</span>`
+                : `<span class="absolute bottom-0.5 left-0.5 px-1 py-0.2 rounded text-[7.5px] font-bold bg-indigo-600 text-white leading-tight">Ảnh phụ</span>`;
+
             item.innerHTML = `
                 <img src="${objectUrl}" alt="Ảnh mới ${idx + 1}" class="w-full h-full object-cover">
                 <button type="button" onclick="removeNewSecondaryImage(${idx})" class="absolute top-1 right-1 w-5 h-5 rounded-md bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center text-[9px] shadow-sm transition-all cursor-pointer opacity-90 hover:opacity-100" title="Xóa ảnh này">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
-                <span class="absolute bottom-1 left-1 px-1 py-0.2 rounded text-[8px] font-bold bg-indigo-600 text-white">Ảnh mới</span>
+                ${badgeHtml}
             `;
             grid.appendChild(item);
         });
@@ -687,9 +697,8 @@ if ($db) {
         document.getElementById('prodTitle').value = '';
         document.getElementById('prodPrice').value = '';
         document.getElementById('prodSalePrice').value = '';
-        document.getElementById('prodThumbnail').value = '';
         
-        // Reset danh sách ảnh phụ
+        // Reset danh sách ảnh
         selectedSecondaryFiles = [];
         existingSecondaryImages = [];
         const fileInput = document.getElementById('secondaryImagesInput');
@@ -714,25 +723,40 @@ if ($db) {
         document.getElementById('prodCatId').value = p.category_id;
         document.getElementById('prodPrice').value = p.price;
         document.getElementById('prodSalePrice').value = p.sale_price || '';
-        document.getElementById('prodThumbnail').value = p.thumbnail || '';
 
-        // Đổ danh sách ảnh phụ đã có
+        // Đổ danh sách ảnh: Ảnh thumbnail cũ làm ảnh số 1, tiếp theo là gallery
         selectedSecondaryFiles = [];
         existingSecondaryImages = [];
         const fileInput = document.getElementById('secondaryImagesInput');
         if (fileInput) fileInput.value = '';
 
+        if (p.thumbnail && p.thumbnail !== 'assets/images/default-thumbnail.jpg') {
+            existingSecondaryImages.push(p.thumbnail);
+        }
+
         if (p.gallery) {
             try {
                 let parsed = typeof p.gallery === 'string' ? JSON.parse(p.gallery) : p.gallery;
                 if (Array.isArray(parsed)) {
-                    existingSecondaryImages = parsed.filter(x => typeof x === 'string' && x.trim() !== '').slice(0, 5);
+                    parsed.forEach(img => {
+                        if (typeof img === 'string' && img.trim() !== '' && !existingSecondaryImages.includes(img.trim()) && existingSecondaryImages.length < 5) {
+                            existingSecondaryImages.push(img.trim());
+                        }
+                    });
                 } else if (typeof p.gallery === 'string') {
-                    existingSecondaryImages = p.gallery.split(/[\r\n,]+/).map(x => x.trim()).filter(Boolean).slice(0, 5);
+                    p.gallery.split(/[\r\n,]+/).map(x => x.trim()).filter(Boolean).forEach(img => {
+                        if (!existingSecondaryImages.includes(img) && existingSecondaryImages.length < 5) {
+                            existingSecondaryImages.push(img);
+                        }
+                    });
                 }
             } catch(e) {
                 if (typeof p.gallery === 'string') {
-                    existingSecondaryImages = p.gallery.split(/[\r\n,]+/).map(x => x.trim()).filter(Boolean).slice(0, 5);
+                    p.gallery.split(/[\r\n,]+/).map(x => x.trim()).filter(Boolean).forEach(img => {
+                        if (!existingSecondaryImages.includes(img) && existingSecondaryImages.length < 5) {
+                            existingSecondaryImages.push(img);
+                        }
+                    });
                 }
             }
         }
@@ -763,18 +787,12 @@ if ($db) {
     });
 
     function confirmDeleteProduct(id, title) {
-        Swal.fire({
-            title: 'Xác Nhận Xóa Mã Nguồn',
-            text: `Bạn có chắc muốn xóa vĩnh viễn "${title}"?`,
+        confirmAction('<?= BASE_URL ?>/admin/products?delete_id=' + id, {
+            title: 'Xóa Mã Nguồn',
+            text: `Bạn có chắc chắn muốn xóa vĩnh viễn sản phẩm "${title}"? Thao tác này không thể hoàn tác.`,
             icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Đồng ý xóa',
-            cancelButtonText: 'Hủy bỏ',
-            confirmButtonColor: '#e11d48'
-        }).then((res) => {
-            if (res.isConfirmed) {
-                window.location.href = '<?= BASE_URL ?>/admin/products?delete_id=' + id;
-            }
+            confirmText: 'Đồng Ý Xóa',
+            isDanger: true
         });
     }
 </script>
