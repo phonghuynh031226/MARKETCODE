@@ -80,6 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save_settings'
                 'momo_access_key'            => trim($_POST['momo_access_key'] ?? '') !== '' ? trim($_POST['momo_access_key']) : get_setting('momo_access_key', ''),
                 'momo_secret_key'            => trim($_POST['momo_secret_key'] ?? '') !== '' ? trim($_POST['momo_secret_key']) : get_setting('momo_secret_key', ''),
                 'momo_api_endpoint'          => trim($_POST['momo_api_endpoint'] ?? get_setting('momo_api_endpoint', 'https://payment.momo.vn/v2/gateway/api/create')),
+                'momo_public_base_url'       => trim($_POST['momo_public_base_url'] ?? ''),
                 // Cổng gạch thẻ
                 'card_api_url'               => trim($_POST['card_api_url'] ?? ''),
                 'card_partner_id'            => trim($_POST['card_partner_id'] ?? ''),
@@ -301,6 +302,12 @@ $cardCallbackUrl = $current_domain . '/api/callback_card.php';
                         <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Secret Key</label>
                         <input type="password" name="momo_secret_key" value="" autocomplete="new-password" placeholder="Để trống nếu giữ khóa đã lưu" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-pink-500">
                         <p class="text-[11px] text-slate-500 mt-1.5">Khóa không được hiển thị lại sau khi lưu. Nếu đã lộ, hãy đổi khóa trong MoMo Business trước khi dùng.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Public Domain / URL Callback (HTTPS)</label>
+                        <input type="text" name="momo_public_base_url" value="<?= xss_clean(get_setting('momo_public_base_url', '')) ?>" placeholder="Mặc định để trống sẽ tự động lấy: <?= xss_clean($current_domain) ?>" class="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:bg-white focus:border-pink-500">
+                        <p class="text-[11px] text-slate-500 mt-1.5">Tự động nhận diện domain công khai để gửi IPN Webhook và Return URL cho MoMo. Chỉ điền nếu bạn dùng domain riêng.</p>
                     </div>
 
                     <div class="p-4 rounded-xl bg-pink-50 border border-pink-100 text-xs text-slate-600 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-2">
