@@ -50,7 +50,7 @@ try {
         `email` VARCHAR(255) NOT NULL,
         `token` VARCHAR(10) NOT NULL,
         `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
 } catch (Exception $e) {
     $db = null;
 }
