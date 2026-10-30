@@ -466,7 +466,15 @@ async function startMomoPayment() {
     button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Đang kết nối MoMo...';
     try {
         const response = await fetch('<?= BASE_URL ?>/api/momo_create_payment.php', { method: 'POST', body: formData });
-        const data = await response.json();
+        const rawText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(rawText);
+        } catch (parseErr) {
+            console.error('MoMo raw response:', rawText);
+            const cleanError = rawText.replace(/<[^>]*>?/gm, '').trim().substring(0, 200);
+            throw new Error(cleanError || 'Máy chủ trả về dữ liệu không hợp lệ.');
+        }
         if (!response.ok || !data.success || !data.pay_url) throw new Error(data.message || 'Không tạo được giao dịch MoMo.');
         window.location.assign(data.pay_url);
     } catch (error) {

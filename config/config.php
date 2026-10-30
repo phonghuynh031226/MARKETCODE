@@ -56,6 +56,25 @@ try {
         `token` VARCHAR(10) NOT NULL,
         `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+
+    // Tự động khởi tạo bảng momo_transactions nếu chưa có
+    $db->exec("CREATE TABLE IF NOT EXISTS `momo_transactions` (
+        `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+        `order_id` VARCHAR(64) NOT NULL,
+        `request_id` VARCHAR(64) NOT NULL,
+        `user_id` INT UNSIGNED NOT NULL,
+        `amount` BIGINT UNSIGNED NOT NULL,
+        `status` ENUM('pending', 'success', 'failed') NOT NULL DEFAULT 'pending',
+        `momo_trans_id` VARCHAR(64) DEFAULT NULL,
+        `result_code` INT DEFAULT NULL,
+        `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `uk_momo_order_id` (`order_id`),
+        UNIQUE KEY `uk_momo_request_id` (`request_id`),
+        KEY `idx_momo_user_created` (`user_id`, `created_at`),
+        KEY `idx_momo_status` (`status`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
 } catch (Exception $e) {
     $db = null;
 }

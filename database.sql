@@ -29,7 +29,7 @@ CREATE TABLE `balance_logs` (
   `amount_before` decimal(15,2) NOT NULL,
   `amount` decimal(15,2) NOT NULL COMMENT 'Số tiền biến động (+ hoặc -)',
   `amount_after` decimal(15,2) NOT NULL,
-  `type` enum('deposit_card','deposit_bank','buy_code','admin_adjust','refund') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` enum('deposit_card','deposit_bank','deposit_momo','buy_code','admin_adjust','refund') COLLATE utf8mb4_unicode_ci NOT NULL,
   `note` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -155,6 +155,41 @@ LOCK TABLES `categories` WRITE;
 /*!40000 ALTER TABLE `categories` DISABLE KEYS */;
 INSERT INTO `categories` VALUES (1,'PHP & Laravel','php-laravel','fa-brands fa-php','Hệ thống website PHP thuần, CodeIgniter, Laravel hoàn chỉnh',1,1,'2026-10-25 13:48:40','2026-10-25 13:48:40'),(2,'Node.js & React','nodejs-react','fa-brands fa-node-js','Full-stack MERN, Next.js, API backend hiệu năng cao',2,1,'2026-10-25 13:48:40','2026-10-25 13:48:40'),(3,'Python & Django/FastAPI','python-django','fa-brands fa-python','Tools tự động hóa, AI script, Backend API Django/FastAPI',3,1,'2026-10-25 13:48:40','2026-10-25 13:48:40'),(4,'Mobile Apps (Flutter/React Native)','mobile-apps','fa-solid fa-mobile-screen','Ứng dụng di động iOS/Android đa nền tảng',4,1,'2026-10-25 13:48:40','2026-10-25 13:48:40'),(5,'Game & Unity','game-unity','fa-solid fa-gamepad','Source code game 2D/3D Unity, HTML5 mini game',5,1,'2026-10-25 13:48:40','2026-10-25 13:48:40'),(6,'WordPress Plugins & Themes','wordpress','fa-brands fa-wordpress','Giao diện & tiện ích mở rộng WordPress chuẩn SEO',6,1,'2026-10-25 13:48:40','2026-10-25 13:48:40');
 /*!40000 ALTER TABLE `categories` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `momo_transactions`
+--
+
+DROP TABLE IF EXISTS `momo_transactions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `momo_transactions` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `order_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `request_id` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` int unsigned NOT NULL,
+  `amount` bigint unsigned NOT NULL,
+  `status` enum('pending','success','failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `momo_trans_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `result_code` int DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_momo_order_id` (`order_id`),
+  UNIQUE KEY `uk_momo_request_id` (`request_id`),
+  KEY `idx_momo_user_created` (`user_id`,`created_at`),
+  KEY `idx_momo_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `momo_transactions`
+--
+
+LOCK TABLES `momo_transactions` WRITE;
+/*!40000 ALTER TABLE `momo_transactions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `momo_transactions` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -319,7 +354,7 @@ CREATE TABLE `settings` (
 
 LOCK TABLES `settings` WRITE;
 /*!40000 ALTER TABLE `settings` DISABLE KEYS */;
-INSERT INTO `settings` VALUES (1,'site_name','MARKETCODE.VN - Sàn Giao Dịch Mã Nguồn Số 1','Tên website chính thức','2026-10-29 13:29:18'),(2,'site_logo','assets/images/logo_1793255358.png','Đường dẫn file logo website','2026-10-29 13:29:18'),(3,'site_favicon','assets/images/favicon_1793255358.png','Đường dẫn favicon website','2026-10-29 13:29:18'),(4,'site_description','Chợ mua bán mã nguồn chất lượng cao, chia sẻ template website, ứng dụng mobile, bảo hành và cài đặt nhanh chóng.','Mô tả SEO website','2026-10-29 13:29:18'),(5,'site_keywords','','Từ khóa SEO','2026-10-29 13:29:18'),(6,'contact_hotline','0988.888.888','Hotline hỗ trợ kỹ thuật','2026-10-29 13:29:18'),(7,'contact_email','support@marketcode.vn','Email hỗ trợ','2026-10-29 13:29:18'),(8,'contact_telegram','https://t.me/admin_marketcode','Telegram hỗ trợ','2026-10-29 13:29:18'),(9,'bank_name','MB Bank (Quân Đội)','Tên ngân hàng nhận tiền','2026-10-25 13:48:40'),(10,'bank_account_name','NGUYEN VAN A','Chủ tài khoản ngân hàng','2026-10-25 13:48:40'),(11,'bank_account_number','999988889999','Số tài khoản ngân hàng','2026-10-25 13:48:40'),(12,'bank_bin','970422','Mã BIN ngân hàng MBBank để gen VietQR','2026-10-25 13:48:40'),(13,'bank_prefix','NAPTIEN','Cú pháp nạp tiền trước ID user (VD: NAPTIEN 1)','2026-10-25 13:48:40'),(14,'card_partner_id','','Partner ID cổng gạch thẻ','2026-10-29 13:29:18'),(15,'card_partner_key','','Partner Key cổng gạch thẻ','2026-10-29 13:29:18'),(16,'card_api_url','https://thesieure.com/chargingws/v2','Endpoint API gạch thẻ cào','2026-10-29 13:29:18'),(17,'oauth_google_client_id','','Google OAuth Client ID','2026-10-29 13:29:18'),(18,'oauth_google_client_secret','','Google OAuth Client Secret','2026-10-29 13:29:18'),(19,'oauth_google_redirect_uri','/auth/google.php','Google OAuth Redirect URI','2026-10-29 13:29:18'),(20,'oauth_facebook_app_id','','Facebook App ID','2026-10-29 13:29:18'),(21,'oauth_facebook_app_secret','','Facebook App Secret','2026-10-29 13:29:18'),(22,'oauth_facebook_redirect_uri','/auth/facebook.php','Facebook OAuth Redirect URI','2026-10-29 13:29:18'),(23,'recaptcha_site_key','','Google reCAPTCHA v2 Site Key','2026-10-29 13:29:18'),(24,'recaptcha_secret_key','','Google reCAPTCHA v2 Secret Key','2026-10-29 13:29:18'),(25,'popup_enabled','1','Bật tắt popup thông báo nổi trang chủ (1: Bật, 0: Tắt)','2026-10-29 13:29:18'),(26,'popup_title','📢 THÔNG BÁO HỆ THỐNG & KHUYẾN MÃI MỚI NHẤT','Tiêu đề popup thông báo trang chủ','2026-10-29 13:29:18'),(27,'popup_content','<p class=\"mb-3 font-semibold text-brand-400\">Chào mừng quý khách đến với MARKETCODE.VN - Chợ Mã Nguồn Số 1 Việt Nam!</p><ul class=\"space-y-2 list-disc pl-5 text-xs text-gray-300\"><li><strong>Khuyến Mãi Nạp Tiền:</strong> Tặng ngay <strong>+10% giá trị</strong> cho tất cả giao dịch nạp qua VietQR Ngân hàng hôm nay.</li><li><strong>Cam Kết Chất Lượng:</strong> Toàn bộ source code được kiểm duyệt nghiêm ngặt, sạch 100% không mã độc và cam kết hỗ trợ cài đặt chạy thành công.</li><li><strong>Kênh Hỗ Trợ Kỹ Thuật:</strong> Tham gia nhóm Telegram <a href=\"https://t.me/admin_marketcode\" target=\"_blank\" class=\"text-indigo-400 underline font-bold\">@marketcode_support</a> để được hỗ trợ 24/7.</li></ul>','Nội dung HTML popup thông báo trang chủ','2026-10-29 13:29:18'),(28,'momo_partner_code','MOMOM7RQ20250327','MoMo Partner Code','2026-10-29 13:29:18'),(29,'momo_access_key','ZL6mPDuL5SrXA1MQ','MoMo Access Key','2026-10-29 13:29:18'),(30,'momo_secret_key','ltpIRmVqaLOeTwJiQG2jJxthTM42EPoF','MoMo Secret Key','2026-10-29 13:29:18'),(31,'momo_api_endpoint','https://payment.momo.vn/v2/gateway/api/create','MoMo API Endpoint','2026-10-29 13:29:18'),(56,'oauth_zalo_app_id','','','2026-10-29 13:29:18'),(57,'oauth_zalo_secret_key','','','2026-10-29 13:29:18'),(58,'oauth_zalo_redirect_uri','http://localhost:8000/oauth_zalo.php','','2026-10-29 13:29:18'),(61,'cron_security_key','marketcode_cron_secret','','2026-10-29 13:29:18');
+INSERT INTO `settings` VALUES (1,'site_name','MARKETCODE.VN - Sàn Giao Dịch Mã Nguồn Số 1','Tên website chính thức','2026-10-29 13:29:18'),(2,'site_logo','assets/images/logo_1793255358.png','Đường dẫn file logo website','2026-10-29 13:29:18'),(3,'site_favicon','assets/images/favicon_1793255358.png','Đường dẫn favicon website','2026-10-29 13:29:18'),(4,'site_description','Chợ mua bán mã nguồn chất lượng cao, chia sẻ template website, ứng dụng mobile, bảo hành và cài đặt nhanh chóng.','Mô tả SEO website','2026-10-29 13:29:18'),(5,'site_keywords','','Từ khóa SEO','2026-10-29 13:29:18'),(6,'contact_hotline','0988.888.888','Hotline hỗ trợ kỹ thuật','2026-10-29 13:29:18'),(7,'contact_email','support@marketcode.vn','Email hỗ trợ','2026-10-29 13:29:18'),(8,'contact_telegram','https://t.me/admin_marketcode','Telegram hỗ trợ','2026-10-29 13:29:18'),(9,'bank_name','MB Bank (Quân Đội)','Tên ngân hàng nhận tiền','2026-10-25 13:48:40'),(10,'bank_account_name','NGUYEN VAN A','Chủ tài khoản ngân hàng','2026-10-25 13:48:40'),(11,'bank_account_number','999988889999','Số tài khoản ngân hàng','2026-10-25 13:48:40'),(12,'bank_bin','970422','Mã BIN ngân hàng MBBank để gen VietQR','2026-10-25 13:48:40'),(13,'bank_prefix','NAPTIEN','Cú pháp nạp tiền trước ID user (VD: NAPTIEN 1)','2026-10-25 13:48:40'),(14,'card_partner_id','','Partner ID cổng gạch thẻ','2026-10-29 13:29:18'),(15,'card_partner_key','','Partner Key cổng gạch thẻ','2026-10-29 13:29:18'),(16,'card_api_url','https://thesieure.com/chargingws/v2','Endpoint API gạch thẻ cào','2026-10-29 13:29:18'),(17,'oauth_google_client_id','','Google OAuth Client ID','2026-10-30 15:47:06'),(18,'oauth_google_client_secret','','Google OAuth Client Secret','2026-10-30 15:47:06'),(19,'oauth_google_redirect_uri','/auth/google.php','Google OAuth Redirect URI','2026-10-29 13:29:18'),(20,'oauth_facebook_app_id','','Facebook App ID','2026-10-29 13:29:18'),(21,'oauth_facebook_app_secret','','Facebook App Secret','2026-10-29 13:29:18'),(22,'oauth_facebook_redirect_uri','/auth/facebook.php','Facebook OAuth Redirect URI','2026-10-29 13:29:18'),(23,'recaptcha_site_key','','Google reCAPTCHA v2 Site Key','2026-10-29 13:29:18'),(24,'recaptcha_secret_key','','Google reCAPTCHA v2 Secret Key','2026-10-29 13:29:18'),(25,'popup_enabled','1','Bật tắt popup thông báo nổi trang chủ (1: Bật, 0: Tắt)','2026-10-29 13:29:18'),(26,'popup_title','📢 THÔNG BÁO HỆ THỐNG & KHUYẾN MÃI MỚI NHẤT','Tiêu đề popup thông báo trang chủ','2026-10-29 13:29:18'),(27,'popup_content','<p class=\"mb-3 font-semibold text-brand-400\">Chào mừng quý khách đến với MARKETCODE.VN - Chợ Mã Nguồn Số 1 Việt Nam!</p><ul class=\"space-y-2 list-disc pl-5 text-xs text-gray-300\"><li><strong>Khuyến Mãi Nạp Tiền:</strong> Tặng ngay <strong>+10% giá trị</strong> cho tất cả giao dịch nạp qua VietQR Ngân hàng hôm nay.</li><li><strong>Cam Kết Chất Lượng:</strong> Toàn bộ source code được kiểm duyệt nghiêm ngặt, sạch 100% không mã độc và cam kết hỗ trợ cài đặt chạy thành công.</li><li><strong>Kênh Hỗ Trợ Kỹ Thuật:</strong> Tham gia nhóm Telegram <a href=\"https://t.me/admin_marketcode\" target=\"_blank\" class=\"text-indigo-400 underline font-bold\">@marketcode_support</a> để được hỗ trợ 24/7.</li></ul>','Nội dung HTML popup thông báo trang chủ','2026-10-29 13:29:18'),(28,'momo_partner_code','MOMOM7RQ20250327','MoMo Partner Code','2026-10-29 13:29:18'),(29,'momo_access_key','ZL6mPDuL5SrXA1MQ','MoMo Access Key','2026-10-29 13:29:18'),(30,'momo_secret_key','ltpIRmVqaLOeTwJiQG2jJxthTM42EPoF','MoMo Secret Key','2026-10-29 13:29:18'),(31,'momo_api_endpoint','https://payment.momo.vn/v2/gateway/api/create','MoMo API Endpoint','2026-10-29 13:29:18'),(56,'oauth_zalo_app_id','','','2026-10-29 13:29:18'),(57,'oauth_zalo_secret_key','','','2026-10-29 13:29:18'),(58,'oauth_zalo_redirect_uri','http://localhost:8000/oauth_zalo.php','','2026-10-29 13:29:18'),(61,'cron_security_key','marketcode_cron_secret','','2026-10-29 13:29:18');
 /*!40000 ALTER TABLE `settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -378,4 +413,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-30 15:23:27
+-- Dump completed on 2026-10-30 15:47:16
