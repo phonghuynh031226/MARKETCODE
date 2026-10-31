@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * ========================================================
  * FRONT CONTROLLER ROUTER & DISPATCHER
@@ -8,11 +9,15 @@
 $requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
 $route = trim($requestUri, '/');
 
+$decodedRoute = rawurldecode($route);
+if (preg_match('#(?:^|/)(?:\\.|config|includes|brain|database|docs|tests|storage|delivery)(?:/|$)|\\.(sql|log|bak|old|ini|env|zip|tar|gz)$#i', $decodedRoute) || str_contains($decodedRoute, '..')) {
+    http_response_code(403); exit('Forbidden');
+}
 if ($route !== '' && $route !== 'index' && $route !== 'index.php') {
     // 1. Chặn truy cập trực tiếp vào các thư mục nhạy cảm
     if (preg_match('#^(config|includes|brain|\.git)(/|$)#i', $route)) {
         http_response_code(403);
-        echo "<!DOCTYPE html><html lang='vi'><head><meta charset='UTF-8'><title>403 Forbidden</title><script src='https://cdn.tailwindcss.com'></script></head><body class='bg-slate-50 min-h-screen flex items-center justify-center p-4 font-sans text-center'><div class='max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4'><div class='w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center text-2xl font-bold mx-auto'>!</div><h1 class='text-xl font-extrabold text-slate-900'>403 Forbidden</h1><p class='text-xs text-slate-500'>Truy cập thư mục hệ thống bị từ chối.</p><a href='/' class='inline-block px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 shadow-sm'>Về Trang Chủ</a></div></body></html>";
+        echo "<!DOCTYPE html><html lang='vi'><head><meta charset='UTF-8'><title>403 Forbidden</title></head><body class='bg-slate-50 min-h-screen flex items-center justify-center p-4 font-sans text-center'><div class='max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4'><div class='w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center text-2xl font-bold mx-auto'>!</div><h1 class='text-xl font-extrabold text-slate-900'>403 Forbidden</h1><p class='text-xs text-slate-500'>Truy cập thư mục hệ thống bị từ chối.</p><a href='/' class='inline-block px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 shadow-sm'>Về Trang Chủ</a></div></body></html>";
         exit;
     }
 
@@ -60,8 +65,8 @@ if ($route !== '' && $route !== 'index' && $route !== 'index.php') {
     }
 
     // 4. Các đường dẫn thân thiện đặc biệt (Pretty URL cho Chi tiết Sản phẩm & Danh mục)
-    if (preg_match('#^(product|code)/([0-9]+)$#', $route, $matches)) {
-        $_GET['id'] = (int)$matches[2];
+    if (preg_match('#^(product|code)/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$#', $route, $matches)) {
+        $_GET['id'] = $matches[2];
         $_SERVER['SCRIPT_NAME'] = '/product.php';
         $_SERVER['PHP_SELF']    = '/product.php';
         require __DIR__ . '/product.php';
@@ -120,11 +125,13 @@ if ($route !== '' && $route !== 'index' && $route !== 'index.php') {
 
     // 9. Không tìm thấy đường dẫn -> 404 Not Found
     http_response_code(404);
-    echo "<!DOCTYPE html><html lang='vi'><head><meta charset='UTF-8'><title>404 Không Tìm Thấy Trang</title><script src='https://cdn.tailwindcss.com'></script></head><body class='bg-slate-50 min-h-screen flex items-center justify-center p-4 text-center font-sans'><div class='max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4'><div class='w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl font-bold mx-auto'>404</div><h1 class='text-xl font-extrabold text-slate-900'>Không Tìm Thấy Trang</h1><p class='text-xs text-slate-500'>Đường dẫn bạn yêu cầu không tồn tại hoặc đã bị thay đổi.</p><a href='/' class='inline-block px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-colors shadow-sm'>Về Trang Chủ</a></div></body></html>";
+    echo "<!DOCTYPE html><html lang='vi'><head><meta charset='UTF-8'><title>404 Không Tìm Thấy Trang</title></head><body class='bg-slate-50 min-h-screen flex items-center justify-center p-4 text-center font-sans'><div class='max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4'><div class='w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl font-bold mx-auto'>404</div><h1 class='text-xl font-extrabold text-slate-900'>Không Tìm Thấy Trang</h1><p class='text-xs text-slate-500'>Đường dẫn bạn yêu cầu không tồn tại hoặc đã bị thay đổi.</p><a href='/' class='inline-block px-5 py-2.5 rounded-xl bg-indigo-600 text-white font-bold text-xs hover:bg-indigo-700 transition-colors shadow-sm'>Về Trang Chủ</a></div></body></html>";
     exit;
 }
 
 $pageTitle = "Trang Chủ - Mua Bán Mã Nguồn Chất Lượng Cao";
+// Initialize the existing configuration before the guarded shared header.
+require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/includes/header.php';
 require_once __DIR__ . '/includes/navbar.php';
 
@@ -137,7 +144,7 @@ $sortBy = trim($_GET['sort'] ?? 'newest');
 $categories = [];
 if ($db) {
     try {
-        $catStmt = $db->query("SELECT * FROM categories WHERE status = 1 ORDER BY sort_order ASC");
+        $catStmt = $db->query("SELECT * FROM categories WHERE status = 1 AND deleted_at IS NULL ORDER BY sort_order ASC");
         $categories = $catStmt->fetchAll();
     } catch (Exception $e) {}
 }
@@ -146,16 +153,16 @@ if ($db) {
 $products = [];
 if ($db) {
     try {
-        $sql = "SELECT p.*, c.name as category_name, c.slug as category_slug 
-                FROM products p 
-                JOIN categories c ON p.category_id = c.id 
-                WHERE p.status = 'active'";
+        $sql = "SELECT p.*, c.name as category_name, c.slug as category_slug
+                FROM products p
+                JOIN categories c ON p.category_id = c.id
+                WHERE p.status = 'active' AND p.deleted_at IS NULL AND c.deleted_at IS NULL";
         $params = [];
 
         if (!empty($searchKeyword)) {
-            $sql .= " AND (p.title LIKE ? OR p.short_desc LIKE ?)";
-            $params[] = "%$searchKeyword%";
-            $params[] = "%$searchKeyword%";
+            $sql .= " AND (p.title LIKE ? ESCAPE '!' OR p.short_desc LIKE ? ESCAPE '!')";
+            $params[] = like_pattern($searchKeyword);
+            $params[] = like_pattern($searchKeyword);
         }
 
         if (!empty($selectedCategory)) {
@@ -163,26 +170,13 @@ if ($db) {
             $params[] = $selectedCategory;
         }
 
-        switch ($sortBy) {
-            case 'price_asc':
-                $sql .= " ORDER BY COALESCE(p.sale_price, p.price) ASC";
-                break;
-            case 'price_desc':
-                $sql .= " ORDER BY COALESCE(p.sale_price, p.price) DESC";
-                break;
-            case 'views_desc':
-            case 'views':
-                $sql .= " ORDER BY p.views DESC";
-                break;
-            case 'popular':
-            case 'downloads_desc':
-                $sql .= " ORDER BY p.download_count DESC";
-                break;
-            case 'newest':
-            default:
-                $sql .= " ORDER BY p.id DESC";
-                break;
-        }
+        $sql .= match ($sortBy) {
+            'price_asc' => ' ORDER BY COALESCE(p.sale_price, p.price) ASC',
+            'price_desc' => ' ORDER BY COALESCE(p.sale_price, p.price) DESC',
+            'views_desc', 'views' => ' ORDER BY p.views DESC',
+            'popular', 'downloads_desc' => ' ORDER BY p.download_count DESC',
+            default => ' ORDER BY p.id DESC',
+        };
 
         $prodStmt = $db->prepare($sql);
         $prodStmt->execute($params);
@@ -192,67 +186,6 @@ if ($db) {
     }
 }
 
-// Nếu DB chưa có dữ liệu mẫu, tạo fallback demo data để giao diện luôn hiển thị lung linh
-if (empty($products)) {
-    $products = [
-        [
-            'id' => 1,
-            'title' => 'Hệ Thống Website Bán Mã Nguồn Tự Động PHP Thuần PDO',
-            'slug' => 'he-thong-web-ban-ma-nguon-tu-dong-php',
-            'category_name' => 'PHP & Laravel',
-            'category_slug' => 'php-laravel',
-            'short_desc' => 'Tự động hóa nạp thẻ cào, VietQR tự động, quản trị toàn diện, bảo mật CSRF & BCRYPT.',
-            'price' => 499000,
-            'sale_price' => 350000,
-            'thumbnail' => 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&auto=format&fit=crop&q=80',
-            'demo_url' => 'https://demo.marketcode.vn',
-            'download_count' => 128,
-            'views' => 1420,
-        ],
-        [
-            'id' => 2,
-            'title' => 'Full-Stack E-Commerce Next.js 14 & Node.js Microservices',
-            'slug' => 'full-stack-ecommerce-nextjs-nodejs',
-            'category_name' => 'Node.js & React',
-            'category_slug' => 'nodejs-react',
-            'short_desc' => 'App Router, Redux Toolkit, Stripe & PayPal, Tailwind CSS, tối ưu SEO 100 điểm Lighthouse.',
-            'price' => 890000,
-            'sale_price' => 650000,
-            'thumbnail' => 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=80',
-            'demo_url' => 'https://next-ecommerce.demo.vn',
-            'download_count' => 89,
-            'views' => 980,
-        ],
-        [
-            'id' => 3,
-            'title' => 'Flutter Food Delivery App (iOS & Android) + Admin Panel',
-            'slug' => 'flutter-food-delivery-app-ios-android',
-            'category_name' => 'Mobile Apps',
-            'category_slug' => 'mobile-apps',
-            'short_desc' => 'Định vị GPS shipper thời gian thực, thông báo push Firebase, tích hợp cổng thanh toán.',
-            'price' => 1200000,
-            'sale_price' => 890000,
-            'thumbnail' => 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80',
-            'demo_url' => 'https://flutter-food.demo.vn',
-            'download_count' => 215,
-            'views' => 1860,
-        ],
-        [
-            'id' => 4,
-            'title' => 'Python Bot Quét Dữ Liệu TMĐT & Gửi Báo Cáo Telegram',
-            'slug' => 'python-bot-auto-crawl-telegram',
-            'category_name' => 'Python & AI',
-            'category_slug' => 'python-django',
-            'short_desc' => 'Thu thập giá Shopee, Lazada tự động, phát hiện giảm giá sốc và gửi tin nhắn Telegram tức thì.',
-            'price' => 250000,
-            'sale_price' => 199000,
-            'thumbnail' => 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=800&auto=format&fit=crop&q=80',
-            'demo_url' => 'https://t.me/demo_crawler_bot',
-            'download_count' => 340,
-            'views' => 2450,
-        ]
-    ];
-}
 ?>
 
 <!-- HERO SECTION (Modern Clean Light Aesthetic) -->
@@ -278,7 +211,7 @@ if (empty($products)) {
         </p>
 
         <!-- Search Bar with Live Form -->
-        <form data-aos="fade-up" data-aos-delay="300" action="<?= BASE_URL ?>/" method="GET" class="mt-10 max-w-2xl mx-auto">
+        <form data-aos="fade-up" data-aos-delay="300" action="<?= e(BASE_URL) ?>/" method="GET" class="mt-10 max-w-2xl mx-auto">
             <div class="relative flex items-center bg-white rounded-2xl p-2 border border-slate-200/90 shadow-[0_10px_40px_-10px_rgba(15,23,42,0.08)] transition-all focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10">
                 <i class="fa-solid fa-magnifying-glass text-slate-400 ml-3 text-lg"></i>
                 <input type="text" name="q" value="<?= xss_clean($searchKeyword) ?>" placeholder="Tìm kiếm theo từ khóa (PHP, Flutter, Laravel, E-commerce, Game...)" class="w-full bg-transparent px-4 py-3 text-sm sm:text-base focus:outline-none text-slate-900 placeholder-slate-400">
@@ -399,32 +332,32 @@ if (empty($products)) {
 <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="flex items-center justify-between mb-4">
         <h3 class="text-sm font-bold uppercase tracking-wider text-slate-600">Danh Mục Mã Nguồn</h3>
-        <a href="<?= BASE_URL ?>/categories" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+        <a href="<?= e(BASE_URL) ?>/categories" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
             <span>Mở bộ lọc nâng cao</span>
             <i class="fa-solid fa-arrow-right text-[10px]"></i>
         </a>
     </div>
     <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        <a href="<?= BASE_URL ?>/categories" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md shadow-indigo-600/20">
+        <a href="<?= e(BASE_URL) ?>/categories" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-indigo-600 text-white shadow-md shadow-indigo-600/20">
             <i class="fa-solid fa-border-all mr-2"></i>Tất Cả Danh Mục
         </a>
         <?php if (!empty($categories)): ?>
             <?php foreach ($categories as $cat): ?>
-                <a href="<?= BASE_URL ?>/categories?slug=<?= urlencode($cat['slug']) ?>" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 hover:bg-slate-50 transition-all shadow-sm">
+                <a href="<?= e(BASE_URL) ?>/categories?slug=<?= e(urlencode($cat['slug'])) ?>" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 hover:bg-slate-50 transition-all shadow-sm">
                     <i class="<?= xss_clean($cat['icon']) ?> mr-2 text-indigo-500"></i><?= xss_clean($cat['name']) ?>
                 </a>
             <?php endforeach; ?>
         <?php else: ?>
-            <a href="<?= BASE_URL ?>/categories?slug=php-laravel" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm">
+            <a href="<?= e(BASE_URL) ?>/categories?slug=php-laravel" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm">
                 <i class="fa-brands fa-php mr-2 text-indigo-500"></i>PHP & Laravel
             </a>
-            <a href="<?= BASE_URL ?>/categories?slug=nodejs-react" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm">
+            <a href="<?= e(BASE_URL) ?>/categories?slug=nodejs-react" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm">
                 <i class="fa-brands fa-node-js mr-2 text-indigo-500"></i>Node.js & React
             </a>
-            <a href="<?= BASE_URL ?>/categories?slug=python-django" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm">
+            <a href="<?= e(BASE_URL) ?>/categories?slug=python-django" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm">
                 <i class="fa-brands fa-python mr-2 text-indigo-500"></i>Python & AI
             </a>
-            <a href="<?= BASE_URL ?>/categories?slug=mobile-apps" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm">
+            <a href="<?= e(BASE_URL) ?>/categories?slug=mobile-apps" class="category-pill-item px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap bg-white border border-slate-200 text-slate-700 hover:text-indigo-600 hover:border-indigo-300 transition-all shadow-sm">
                 <i class="fa-solid fa-mobile-screen mr-2 text-indigo-500"></i>Mobile Apps
             </a>
         <?php endif; ?>
@@ -438,7 +371,7 @@ if (empty($products)) {
         <div>
             <h2 class="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
                 <span>Kho Mã Nguồn Mới Cập Nhật</span>
-                <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200/60"><span class="counter-val font-bold" data-target="<?= count($products) ?>"><?= count($products) ?></span> mã nguồn</span>
+                <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200/60"><span class="counter-val font-bold" data-target="<?= e(count($products)) ?>"><?= e(count($products)) ?></span> mã nguồn</span>
             </h2>
             <p class="text-sm text-slate-500 mt-1">Toàn bộ mã nguồn đã được quét virus và kiểm tra chạy tốt trước khi đăng bán.</p>
         </div>
@@ -447,28 +380,28 @@ if (empty($products)) {
         <div class="flex items-center gap-3 w-full sm:w-auto">
             <span class="text-xs font-semibold text-slate-500 whitespace-nowrap">Sắp xếp:</span>
             <select id="sortSelect" onchange="applySort(this.value)" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm cursor-pointer">
-                <option value="newest" <?= $sortBy == 'newest' ? 'selected' : '' ?>>Mới Nhất</option>
-                <option value="views_desc" <?= $sortBy == 'views_desc' ? 'selected' : '' ?>>Xem Nhiều Nhất (Phổ biến)</option>
-                <option value="popular" <?= ($sortBy == 'popular' || $sortBy == 'downloads_desc') ? 'selected' : '' ?>>Tải Nhiều Nhất</option>
-                <option value="price_asc" <?= $sortBy == 'price_asc' ? 'selected' : '' ?>>Giá Thấp Đến Cao</option>
-                <option value="price_desc" <?= $sortBy == 'price_desc' ? 'selected' : '' ?>>Giá Cao Đến Thấp</option>
+                <option value="newest" <?= e($sortBy == 'newest' ? 'selected' : '') ?>>Mới Nhất</option>
+                <option value="views_desc" <?= e($sortBy == 'views_desc' ? 'selected' : '') ?>>Xem Nhiều Nhất (Phổ biến)</option>
+                <option value="popular" <?= e(($sortBy == 'popular' || $sortBy == 'downloads_desc') ? 'selected' : '') ?>>Tải Nhiều Nhất</option>
+                <option value="price_asc" <?= e($sortBy == 'price_asc' ? 'selected' : '') ?>>Giá Thấp Đến Cao</option>
+                <option value="price_desc" <?= e($sortBy == 'price_desc' ? 'selected' : '') ?>>Giá Cao Đến Thấp</option>
             </select>
         </div>
     </div>
 
     <!-- PRODUCT GRID (Modern Clean Light Cards) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="responsive-card-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <?php foreach ($products as $idx => $p): ?>
             <?php
             $currentPrice = !empty($p['sale_price']) && $p['sale_price'] > 0 ? $p['sale_price'] : $p['price'];
             $hasDiscount = !empty($p['sale_price']) && $p['sale_price'] < $p['price'];
             $discountPercent = $hasDiscount ? round((($p['price'] - $p['sale_price']) / $p['price']) * 100) : 0;
             ?>
-            <div class="product-card group bg-white rounded-2xl border border-slate-200/80 overflow-hidden flex flex-col" style="--ci: <?= ($idx % 4) + 1 ?>;">
+            <div class="product-card group bg-white rounded-2xl border border-slate-200/80 overflow-hidden flex flex-col" style="--ci: <?= e(($idx % 4) + 1) ?>;">
                 <!-- Phần Ảnh (aspect-[16/10]) -->
-                <a href="<?= BASE_URL ?>/product?id=<?= $p['id'] ?>" class="product-thumb-container aspect-[16/10] bg-slate-100 block">
-                    <img src="<?= xss_clean($p['thumbnail']) ?>" alt="<?= xss_clean($p['title']) ?>" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='<?= BASE_URL ?>/assets/images/default-code.jpg';">
-                    
+                <a href="<?= e(BASE_URL) ?>/product?id=<?= e(public_reference('products', (int)$p['id'])) ?>" class="product-thumb-container aspect-[16/10] bg-slate-100 block">
+                    <img src="<?= e(safe_url($p['thumbnail'])) ?>" alt="<?= xss_clean($p['title']) ?>" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='<?= e(BASE_URL) ?>/assets/images/default-code.jpg';">
+
                     <!-- Góc trên bên trái ảnh: Badge tên danh mục gọn gàng -->
                     <span class="absolute top-2.5 left-2.5 bg-slate-900/75 backdrop-blur-md text-white text-[11px] font-medium px-2.5 py-1 rounded-lg z-20 truncate max-w-[140px]">
                         <?= xss_clean($p['category_name'] ?? 'Mã Nguồn') ?>
@@ -477,7 +410,7 @@ if (empty($products)) {
                     <!-- Góc trên bên phải ảnh: Badge giảm giá nếu có -->
                     <?php if ($hasDiscount): ?>
                         <span class="absolute top-2.5 right-2.5 bg-rose-500 text-white text-[11px] font-bold px-2 py-1 rounded-lg z-20 shadow-sm">
-                            -<?= $discountPercent ?>%
+                            -<?= e($discountPercent) ?>%
                         </span>
                     <?php endif; ?>
                 </a>
@@ -487,7 +420,7 @@ if (empty($products)) {
                     <div>
                         <!-- Tiêu đề (gọn gàng line-clamp-1) -->
                         <h3 class="text-[15px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
-                            <a href="<?= BASE_URL ?>/product?id=<?= $p['id'] ?>" title="<?= xss_clean($p['title']) ?>">
+                            <a href="<?= e(BASE_URL) ?>/product?id=<?= e(public_reference('products', (int)$p['id'])) ?>" title="<?= xss_clean($p['title']) ?>">
                                 <?= xss_clean($p['title']) ?>
                             </a>
                         </h3>
@@ -503,11 +436,11 @@ if (empty($products)) {
                         <div class="flex items-center gap-4 mt-3 text-xs text-slate-500 font-medium">
                             <span class="inline-flex items-center gap-1.5" title="Lượt xem">
                                 <i class="fa-regular fa-eye text-slate-400"></i>
-                                <span class="counter-val" data-target="<?= (int)($p['views'] ?? $p['view_count'] ?? 0) ?>"><?= number_format((int)($p['views'] ?? $p['view_count'] ?? 0)) ?></span> lượt xem
+                                <span class="counter-val" data-target="<?= e((int)($p['views'] ?? $p['view_count'] ?? 0)) ?>"><?= e(number_format((float)((int)($p['views'] ?? $p['view_count'] ?? 0)))) ?></span> lượt xem
                             </span>
                             <span class="inline-flex items-center gap-1.5" title="Lượt tải">
                                 <i class="fa-solid fa-download text-slate-400"></i>
-                                <span class="counter-val" data-target="<?= (int)$p['download_count'] ?>"><?= number_format((int)$p['download_count']) ?></span> lượt tải
+                                <span class="counter-val" data-target="<?= e((int)$p['download_count']) ?>"><?= e(number_format((float)((int)$p['download_count']))) ?></span> lượt tải
                             </span>
                         </div>
                     </div>
@@ -518,18 +451,18 @@ if (empty($products)) {
                         <div class="flex flex-col justify-center min-w-0 leading-none">
                             <?php if ($hasDiscount && $p['price'] > 0): ?>
                                 <span class="text-[11px] font-medium text-slate-400 line-through mb-1 whitespace-nowrap">
-                                    <?= number_format($p['price'], 0, ',', '.') ?>đ
+                                    <?= e(number_format((float)($p['price']), 0, ',', '.')) ?>đ
                                 </span>
                             <?php else: ?>
                                 <span class="text-[11px] text-transparent mb-1 select-none leading-none whitespace-nowrap" aria-hidden="true">&nbsp;</span>
                             <?php endif; ?>
                             <span class="text-[17px] font-extrabold text-indigo-600 tracking-tight whitespace-nowrap">
-                                <?= $currentPrice <= 0 ? 'Miễn phí' : number_format($currentPrice, 0, ',', '.') . 'đ' ?>
+                                <?= e($currentPrice <= 0 ? 'Miễn phí' : number_format((float)($currentPrice), 0, ',', '.') . 'đ') ?>
                             </span>
                         </div>
 
                         <!-- Bên phải: Nút bấm gọn gàng không rớt dòng -->
-                        <a href="<?= BASE_URL ?>/product?id=<?= $p['id'] ?>" class="product-detail-btn shrink-0 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all duration-300 inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <a href="<?= e(BASE_URL) ?>/product?id=<?= e(public_reference('products', (int)$p['id'])) ?>" class="product-detail-btn shrink-0 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all duration-300 inline-flex items-center gap-1.5 whitespace-nowrap">
                             <span>Chi tiết</span>
                             <i class="product-detail-arrow fa-solid fa-arrow-right text-[10px]"></i>
                         </a>
@@ -547,7 +480,7 @@ if (empty($products)) {
             <h2 class="text-3xl font-extrabold text-slate-900">Tại Sao Chọn MarketCode?</h2>
             <p class="text-sm text-slate-500 mt-2">Chúng tôi đặt chất lượng mã nguồn và sự an tâm của khách hàng lên hàng đầu.</p>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div class="responsive-auto-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div data-aos="zoom-in" data-aos-delay="100" class="flex flex-col items-center text-center p-4 rounded-2xl hover:bg-slate-50 transition-all">
                 <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center text-2xl mb-4 shadow-sm">
                     <i class="fa-solid fa-cloud-arrow-down"></i>
@@ -603,7 +536,7 @@ if (empty($products)) {
             </div>
             <div class="flex items-center justify-between text-xs font-semibold px-1">
                 <span class="text-slate-500">Số dư hiện tại của bạn:</span>
-                <span class="text-emerald-600 font-bold"><?= is_logged() ? format_money($user['balance']) : 'Chưa đăng nhập' ?></span>
+                <span class="text-emerald-600 font-bold"><?= e(is_logged() ? format_money($user['balance']) : 'Chưa đăng nhập') ?></span>
             </div>
         </div>
 
@@ -667,7 +600,7 @@ if (empty($products)) {
         try {
             const formData = new FormData();
             formData.append('product_id', currentProductId);
-            formData.append('csrf_token', '<?= csrf_token() ?>');
+            formData.append('csrf_token', '<?= e(csrf_token()) ?>');
 
             const res = await fetch('<?= BASE_URL ?>/ajax/buy.php', {
                 method: 'POST',
@@ -703,7 +636,7 @@ if (empty($products)) {
                         }
                     });
                 } else {
-                    Swal.fire('Lỗi', data.message || 'Có lỗi xảy ra trong quá trình thanh toán!', 'error');
+                    Swal.fire({titleText: 'Lỗi', text: data.message || 'Có lỗi xảy ra trong quá trình thanh toán!', icon: 'error'});
                 }
             }
         } catch (err) {

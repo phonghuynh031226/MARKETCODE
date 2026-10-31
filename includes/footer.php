@@ -1,3 +1,7 @@
+<?php
+declare(strict_types=1);
+if (!defined('ROOT_PATH')) { http_response_code(404); exit; }
+?>
 <footer class="mt-auto border-t border-slate-200 bg-white transition-colors">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
@@ -23,9 +27,9 @@
                 <a href="<?= BASE_URL ?>/" class="inline-flex items-center gap-3 group">
                     <?php if (!empty($footerLogoUrl)): ?>
                         <?php if ($isFooterLogoWide): ?>
-                            <img src="<?= htmlspecialchars($footerLogoUrl) ?>" alt="MarketCode Logo" class="h-10 w-auto max-w-[200px] object-contain group-hover:scale-105 transition-transform duration-300">
+                            <img src="<?= e(safe_url($footerLogoUrl)) ?>" alt="MarketCode Logo" class="h-10 w-auto max-w-[200px] object-contain group-hover:scale-105 transition-transform duration-300">
                         <?php else: ?>
-                            <img src="<?= htmlspecialchars($footerLogoUrl) ?>" alt="MarketCode Logo" class="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-sm group-hover:scale-105 transition-transform duration-300">
+                            <img src="<?= e(safe_url($footerLogoUrl)) ?>" alt="MarketCode Logo" class="w-10 h-10 rounded-xl object-cover border border-slate-200 shadow-sm group-hover:scale-105 transition-transform duration-300">
                             <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 bg-clip-text text-transparent">
                                 MARKET<span class="text-indigo-600">CODE</span>
                             </span>
@@ -125,10 +129,10 @@ $currentUser = $user ?? current_user();
 <div id="systemAnnouncementModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 opacity-0 pointer-events-none transition-all duration-300">
     <!-- Backdrop with soft blur -->
     <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onclick="closeAnnouncementModal(false)"></div>
-    
+
     <!-- Modal Window (Modern Light SaaS Card) -->
     <div id="systemAnnouncementBox" class="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-3xl bg-white border border-slate-200 text-slate-900 shadow-2xl transform scale-95 transition-all duration-300 overflow-hidden">
-        
+
         <!-- Top accent gradient bar -->
         <div class="h-1.5 w-full bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600"></div>
 
@@ -171,7 +175,7 @@ $currentUser = $user ?? current_user();
 
             <!-- Nội dung HTML thông báo từ CSDL Settings -->
             <div class="prose max-w-none text-slate-700 space-y-3 font-normal leading-relaxed">
-                <?= $popupContent ?>
+                <?= e($popupContent) ?>
             </div>
         </div>
 
@@ -221,14 +225,14 @@ $currentUser = $user ?? current_user();
         const justLoggedIn = <?= $justLoggedIn ? 'true' : 'false' ?>;
         const hideUntil = localStorage.getItem('hide_marketcode_announcement');
         const isHidden = hideUntil && parseInt(hideUntil, 10) > Date.now();
-        
+
         // Xác định trang chủ
         const path = window.location.pathname;
-        const isHome = path.endsWith('/') || 
-                       path.endsWith('/index.php') || 
-                       path === '<?= rtrim(parse_url(BASE_URL, PHP_URL_PATH) ?? '', '/') ?>' || 
-                       path === '<?= rtrim(parse_url(BASE_URL, PHP_URL_PATH) ?? '', '/') ?>/' || 
-                       path === '<?= rtrim(parse_url(BASE_URL, PHP_URL_PATH) ?? '', '/') ?>/index.php';
+        const isHome = path.endsWith('/') ||
+                       path.endsWith('/index.php') ||
+                       path === <?= js(rtrim(parse_url(BASE_URL, PHP_URL_PATH) ?? '', '/')) ?> ||
+                       path === <?= js(rtrim(parse_url(BASE_URL, PHP_URL_PATH) ?? '', '/') . '/') ?> ||
+                       path === <?= js(rtrim(parse_url(BASE_URL, PHP_URL_PATH) ?? '', '/') . '/index.php') ?>;
 
         if (justLoggedIn) {
             setTimeout(openSystemAnnouncementModal, 600);
@@ -255,15 +259,15 @@ $currentUser = $user ?? current_user();
 
     <?php if (!empty($_SESSION['flash_message'])): ?>
         Toast.fire({
-            icon: '<?= $_SESSION['flash_message']['type'] ?? 'info' ?>',
-            title: '<?= addslashes($_SESSION['flash_message']['title'] ?? $_SESSION['flash_message']['text'] ?? '') ?>'
+            icon: <?= js($_SESSION['flash_message']['type'] ?? 'info') ?>,
+            titleText: <?= js($_SESSION['flash_message']['title'] ?? $_SESSION['flash_message']['text'] ?? '') ?>
         });
         <?php unset($_SESSION['flash_message']); ?>
     <?php endif; ?>
 </script>
 
 <!-- AOS (Animate On Scroll) Library JS -->
-<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+<script src="<?= e(BASE_URL . '/assets/vendor/aos.js') ?>"></script>
 
 <!-- MarketCode SaaS Micro-interactions & Animations JS -->
 <script src="<?= BASE_URL ?>/assets/js/animations.js"></script>

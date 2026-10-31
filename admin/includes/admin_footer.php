@@ -1,7 +1,11 @@
+<?php
+declare(strict_types=1);
+if (!defined('ROOT_PATH') || !function_exists('is_admin') || !is_admin()) { http_response_code(404); exit; }
+?>
         </main>
 
         <!-- Footer -->
-        <footer class="h-14 border-t border-slate-200 px-6 sm:px-8 flex items-center justify-between text-xs text-slate-500 shrink-0 bg-white">
+        <footer class="admin-footer h-14 border-t border-slate-200 px-6 sm:px-8 flex items-center justify-between text-xs text-slate-500 shrink-0 bg-white">
             <span>&copy; <?= date('Y') ?> MARKETCODE.VN Management System</span>
             <span>PHP 8.x PDO • Tailwind CSS • Chart.js</span>
         </footer>
@@ -28,21 +32,21 @@
         <?php if (!empty($message)): ?>
             Toast.fire({
                 icon: 'success',
-                title: '<?= addslashes($message) ?>'
+                titleText: <?= js($message) ?>
             });
         <?php endif; ?>
 
         <?php if (!empty($error)): ?>
             Toast.fire({
                 icon: 'error',
-                title: '<?= addslashes($error) ?>'
+                titleText: <?= js($error) ?>
             });
         <?php endif; ?>
 
         <?php if (!empty($_SESSION['flash_message'])): ?>
             Toast.fire({
-                icon: '<?= $_SESSION['flash_message']['type'] ?? 'info' ?>',
-                title: '<?= addslashes($_SESSION['flash_message']['text'] ?? '') ?>'
+                icon: <?= js($_SESSION['flash_message']['type'] ?? 'info') ?>,
+                titleText: <?= js($_SESSION['flash_message']['text'] ?? '') ?>
             });
             <?php unset($_SESSION['flash_message']); ?>
         <?php endif; ?>
@@ -65,7 +69,7 @@
             const actualConfirmColor = isDanger ? '#e11d48' : confirmColor;
 
             return Swal.fire({
-                title: title,
+                titleText: title,
                 text: text,
                 icon: icon,
                 showCancelButton: true,
@@ -88,11 +92,33 @@
                     if (typeof urlOrCallback === 'function') {
                         urlOrCallback();
                     } else if (typeof urlOrCallback === 'string' && urlOrCallback.trim() !== '') {
-                        window.location.href = urlOrCallback;
+                        submitAdminAction(urlOrCallback);
                     }
                 }
             });
         }
+        function submitAdminAction(target) {
+            const url = new URL(target, window.location.origin);
+            if (url.origin !== window.location.origin) return;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = url.pathname;
+            url.searchParams.set('csrf_token', <?= js(csrf_token()) ?>);
+            for (const [name, value] of url.searchParams) {
+                const input = document.createElement('input');
+                input.type = 'hidden'; input.name = name; input.value = value;
+                form.appendChild(input);
+            }
+            document.body.appendChild(form); form.submit();
+        }
+        document.addEventListener('click', function (event) {
+            const link = event.target.closest('a[href]');
+            if (!link) return;
+            const url = new URL(link.href, window.location.origin);
+            if (url.searchParams.has('toggle_status') || url.searchParams.has('toggle_role')) {
+                event.preventDefault(); submitAdminAction(link.href);
+            }
+        });
     </script>
 
     <!-- MarketCode SaaS Animations JS -->

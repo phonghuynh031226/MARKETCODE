@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+if (!defined('ROOT_PATH')) { http_response_code(404); exit; }
 require_once __DIR__ . '/../config/config.php';
 $siteName = get_setting('site_name', 'MARKETCODE.VN - Sàn Giao Dịch Mã Nguồn');
 $siteDesc = get_setting('site_description', 'Chợ mua bán mã nguồn chất lượng cao, chia sẻ template website, ứng dụng mobile.');
@@ -9,18 +11,18 @@ $user = current_user();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= isset($pageTitle) ? xss_clean($pageTitle) . ' | ' : '' ?><?= xss_clean($siteName) ?></title>
+    <title><?= e(isset($pageTitle) ? xss_clean($pageTitle) . ' | ' : '') ?><?= xss_clean($siteName) ?></title>
     <meta name="description" content="<?= xss_clean($siteDesc) ?>">
-    
+
     <?php
     $siteFavicon = get_setting('site_favicon', '');
     if (!empty($siteFavicon)) {
         $faviconUrl = preg_match('#^https?://#i', $siteFavicon) ? $siteFavicon : BASE_URL . '/' . ltrim($siteFavicon, '/');
     ?>
-    <link rel="icon" href="<?= htmlspecialchars($faviconUrl) ?>">
-    <link rel="shortcut icon" href="<?= htmlspecialchars($faviconUrl) ?>">
+    <link rel="icon" href="<?= e(safe_url($faviconUrl)) ?>">
+    <link rel="shortcut icon" href="<?= e(safe_url($faviconUrl)) ?>">
     <?php } ?>
-    
+
     <!-- Clean URL Script: Tự động làm sạch đuôi .php và index.php trên thanh địa chỉ ngay tức thì -->
     <script>
         (function() {
@@ -48,7 +50,7 @@ $user = current_user();
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="<?= e(BASE_URL . '/assets/vendor/tailwind.js') ?>"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -77,19 +79,23 @@ $user = current_user();
     </script>
 
     <!-- SweetAlert2 -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="<?= e(BASE_URL . '/assets/vendor/sweetalert2.min.css') ?>">
+    <script src="<?= e(BASE_URL . '/assets/vendor/sweetalert2.js') ?>"></script>
 
     <!-- AOS (Animate On Scroll) Library CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/aos@2.3.1/dist/aos.css">
+    <link rel="stylesheet" href="<?= e(BASE_URL . '/assets/vendor/aos.css') ?>">
 
     <!-- MarketCode SaaS Animations CSS -->
-    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/animations.css?v=<?= filemtime(__DIR__ . '/../assets/css/animations.css') ?>">
+    <link rel="stylesheet" href="<?= e(BASE_URL) ?>/assets/css/animations.css?v=<?= e(filemtime(__DIR__ . '/../assets/css/animations.css')) ?>">
 
     <style>
         * {
             transition: background-color 0.15s ease, border-color 0.15s ease;
         }
     </style>
+    <link rel="stylesheet" href="<?= e(BASE_URL) ?>/assets/css/responsive.css?v=<?= e(filemtime(__DIR__ . '/../assets/css/responsive.css')) ?>">
+    <link rel="stylesheet" href="<?= e(BASE_URL) ?>/assets/css/navigation.css?v=<?= e(filemtime(__DIR__ . '/../assets/css/navigation.css')) ?>">
+    <script src="<?= e(BASE_URL) ?>/assets/js/navigation.js" defer></script>
+    <script src="<?= e(BASE_URL) ?>/assets/js/image-fallbacks.js" defer></script>
 </head>
-<body class="bg-[#F8FAFC] text-slate-800 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-600 selection:text-white">
+<body class="app-responsive bg-[#F8FAFC] text-slate-800 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-600 selection:text-white">

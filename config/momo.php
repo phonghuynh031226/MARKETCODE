@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * MoMo Gateway configuration.
  * Credentials and endpoint are managed in the admin settings page;

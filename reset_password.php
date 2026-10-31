@@ -1,6 +1,8 @@
 <?php
+declare(strict_types=1);
 $pageTitle = "Đặt Lại Mật Khẩu Mới";
 require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/includes/passwords.php';
 
 // Nếu đã đăng nhập, chuyển hướng về trang chủ
 if (is_logged()) {
@@ -11,13 +13,14 @@ if (is_logged()) {
 $error = '';
 $success = '';
 $email = $_SESSION['reset_email'] ?? trim($_GET['email'] ?? '');
-$flashOtp = $_SESSION['flash_otp_msg'] ?? '';
+$flashOtp = '';
+unset($_SESSION['latest_otp'], $_SESSION['flash_otp_msg']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         $error = 'CSRF Token không hợp lệ. Vui lòng thử lại!';
     } else {
-        $inputEmail       = trim(filter_var($_POST['email'] ?? $email, FILTER_SANITIZE_EMAIL));
+        $inputEmail       = strtolower(trim($_POST['email'] ?? $email));
         $otp              = trim($_POST['otp'] ?? '');
         $newPassword      = $_POST['new_password'] ?? '';
         $confirmPassword  = $_POST['confirm_password'] ?? '';
@@ -26,33 +29,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Không xác định được địa chỉ email. Vui lòng thực hiện lại từ bước quên mật khẩu!';
         } elseif (empty($otp) || strlen($otp) !== 6 || !ctype_digit($otp)) {
             $error = 'Mã xác thực OTP phải gồm đúng 6 chữ số!';
-        } elseif (strlen($newPassword) < 6) {
-            $error = 'Mật khẩu mới phải có tối thiểu 6 ký tự!';
-        } elseif ($newPassword !== $confirmPassword) {
+        } elseif (strlen($newPassword) < 12 || strlen($newPassword) > 1024) {
+            $error = 'Mật khẩu mới phải có từ 12 đến 1024 ký tự!';
+        } elseif (!hash_equals($newPassword, $confirmPassword)) {
             $error = 'Mật khẩu nhập lại không khớp với mật khẩu mới!';
+        } elseif (strlen(security_config('RESET_TOKEN_KEY')) < 32) {
+            $error = 'Khôi phục mật khẩu đang tạm khóa. Vui lòng liên hệ quản trị viên.';
+        } elseif (!security_rate_limit('reset-verify-ip:' . ($_SERVER['REMOTE_ADDR'] ?? ''), 15, 900)
+            || !security_rate_limit('reset-verify-email:' . strtolower($inputEmail), 5, 900)) {
+            $error = 'Bạn đã thử quá nhiều lần. Vui lòng thử lại sau 15 phút.';
         } else {
             try {
+                $db->beginTransaction();
                 // Kiểm tra mã OTP trong bảng password_resets (hiệu lực trong 15 phút)
-                $stmt = $db->prepare("SELECT * FROM password_resets 
-                                      WHERE email = ? AND token = ? 
-                                      AND TIMESTAMPDIFF(MINUTE, created_at, NOW()) <= 15 
-                                      ORDER BY id DESC LIMIT 1");
-                $stmt->execute([$inputEmail, $otp]);
+                $stmt = $db->prepare("SELECT * FROM password_resets
+                                      WHERE email = ?
+                                      AND TIMESTAMPDIFF(MINUTE, created_at, NOW()) <= 15
+                                      ORDER BY id DESC LIMIT 1 FOR UPDATE");
+                $stmt->execute([$inputEmail]);
                 $resetRecord = $stmt->fetch();
 
-                if (!$resetRecord) {
+                $userLock = $db->prepare("SELECT id FROM users WHERE email = ? AND deleted_at IS NULL AND status = 'active' LIMIT 1 FOR UPDATE");
+                $userLock->execute([$inputEmail]);
+                $resetUserId = $userLock->fetchColumn();
+                if (!$resetRecord || !$resetUserId || !hash_equals((string)$resetRecord['token'], reset_token_digest($inputEmail, $otp))) {
+                    $db->rollBack();
                     $error = 'Mã xác thực OTP không chính xác hoặc đã hết hạn (quá 15 phút). Vui lòng yêu cầu mã mới!';
                 } else {
-                    // Mã hóa mật khẩu an toàn chuẩn BCRYPT
-                    $hashedPassword = password_hash($newPassword, PASSWORD_BCRYPT);
+                    // HMAC-SHA256 with environment pepper, then Argon2id
+                    $hashedPassword = app_password_hash($newPassword);
 
                     // Cập nhật mật khẩu mới vào bảng users
-                    $updateStmt = $db->prepare("UPDATE users SET password = ?, updated_at = NOW() WHERE email = ?");
-                    $updateStmt->execute([$hashedPassword, $inputEmail]);
+                    $updateStmt = $db->prepare("UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?");
+                    $updateStmt->execute([$hashedPassword, $resetUserId]);
 
                     // Xóa token vừa sử dụng để tránh dùng lại
                     $delStmt = $db->prepare("DELETE FROM password_resets WHERE email = ?");
                     $delStmt->execute([$inputEmail]);
+                    $db->commit();
 
                     // Dọn dẹp session
                     unset($_SESSION['reset_email']);
@@ -61,8 +75,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     $success = 'Đặt lại mật khẩu thành công! Bạn có thể sử dụng mật khẩu mới để đăng nhập.';
                 }
-            } catch (Exception $e) {
-                $error = 'Lỗi hệ thống khi cập nhật mật khẩu: ' . $e->getMessage();
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) { $db->rollBack(); }
+                $error = 'Lỗi hệ thống khi cập nhật mật khẩu: ' . public_error($e);
             }
         }
     }
@@ -86,7 +101,7 @@ require_once __DIR__ . '/includes/navbar.php';
 }
 </style>
 
-<div class="flex-1 flex items-center justify-center py-10 sm:py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-[#F8FAFC] min-h-[calc(100vh-140px)]">
+<div class="flex-1 flex items-center justify-center py-10 sm:py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-[#F8FAFC] min-h-[calc(100dvh-140px)]">
     <!-- 1. Quầng Sáng Mesh Gradient Nổi Bật Phía Sau -->
     <div class="absolute -top-28 -left-20 w-[520px] h-[520px] bg-gradient-to-tr from-indigo-500/25 via-indigo-300/15 to-transparent rounded-full blur-[110px] pointer-events-none mesh-pulse-1"></div>
     <div class="absolute top-1/2 -right-28 w-[480px] h-[480px] bg-gradient-to-bl from-cyan-400/25 via-sky-300/15 to-transparent rounded-full blur-[120px] pointer-events-none mesh-pulse-2"></div>
@@ -97,7 +112,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
     <!-- 2. Khung Form Chính (Floating Card & Layered Shadows chuẩn Stripe/Linear) -->
     <div class="max-w-4xl w-full grid grid-cols-1 lg:grid-cols-12 rounded-3xl bg-white/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(15,23,42,0.15)] border border-slate-200/80 overflow-hidden relative z-10 transition-all duration-300">
-        
+
         <!-- NỬA BÊN TRÁI: BRAND PANEL (TINH CHỈNH SANG TRỌNG) -->
         <div class="hidden lg:flex lg:col-span-5 flex-col justify-between p-8 md:p-10 bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 text-white relative overflow-hidden select-none">
             <!-- Vòng tròn ánh sáng mờ đa tầng -->
@@ -108,7 +123,7 @@ require_once __DIR__ . '/includes/navbar.php';
             <!-- Top Header & Hướng dẫn bảo mật -->
             <div class="relative z-10 space-y-6">
                 <!-- Logo Brand -->
-                <a href="<?= BASE_URL ?>/" class="flex items-center gap-3 group">
+                <a href="<?= e(BASE_URL) ?>/" class="flex items-center gap-3 group">
                     <?php
                     $authLogo = get_setting('site_logo', '');
                     $authLogoUrl = '';
@@ -120,7 +135,7 @@ require_once __DIR__ . '/includes/navbar.php';
                     }
                     ?>
                     <?php if (!empty($authLogoUrl)): ?>
-                        <img src="<?= htmlspecialchars($authLogoUrl) ?>" alt="Logo" class="w-11 h-11 rounded-2xl object-cover border border-white/20 shadow-inner group-hover:scale-105 transition-transform">
+                        <img src="<?= e($authLogoUrl) ?>" alt="Logo" class="w-11 h-11 rounded-2xl object-cover border border-white/20 shadow-inner group-hover:scale-105 transition-transform">
                     <?php else: ?>
                         <div class="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-inner group-hover:scale-105 transition-transform">
                             <i class="fa-solid fa-code text-lg"></i>
@@ -149,7 +164,7 @@ require_once __DIR__ . '/includes/navbar.php';
                             <i class="fa-solid fa-shield-halved"></i>
                         </div>
                         <div>
-                            <strong class="font-bold block text-white text-xs">Độ dài tối thiểu 6 ký tự</strong>
+                            <strong class="font-bold block text-white text-xs">Độ dài tối thiểu 12 ký tự</strong>
                             <span class="text-indigo-200 text-[11px] block mt-0.5">Nên kết hợp chữ cái và số để tăng bảo mật</span>
                         </div>
                     </div>
@@ -169,7 +184,7 @@ require_once __DIR__ . '/includes/navbar.php';
                             <i class="fa-solid fa-lock"></i>
                         </div>
                         <div>
-                            <strong class="font-bold block text-white text-xs">Mã hóa chuẩn BCRYPT</strong>
+                            <strong class="font-bold block text-white text-xs">Mã hóa chuẩn Argon2id</strong>
                             <span class="text-indigo-200 text-[11px] block mt-0.5">Mật khẩu được lưu trữ dưới dạng băm 1 chiều</span>
                         </div>
                     </div>
@@ -178,7 +193,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
             <!-- Footer: Security Standard -->
             <div class="relative z-10 pt-6 border-t border-white/15 text-[11px] text-indigo-200 flex items-center justify-between font-medium">
-                <span class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-300"></i> BCRYPT & CSRF Protected</span>
+                <span class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-300"></i> Argon2id & CSRF Protected</span>
                 <span class="flex items-center gap-1.5"><i class="fa-solid fa-lock text-indigo-200"></i> SSL 256-bit</span>
             </div>
         </div>
@@ -187,7 +202,7 @@ require_once __DIR__ . '/includes/navbar.php';
         <div class="lg:col-span-7 p-6 sm:p-10 flex flex-col justify-center bg-white/95">
             <!-- Nút Quay lại Đổi Email -->
             <div class="mb-5">
-                <a href="<?= BASE_URL ?>/forgot-password" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors">
+                <a href="<?= e(BASE_URL) ?>/forgot-password" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors">
                     <i class="fa-solid fa-arrow-left text-[11px]"></i>
                     <span>Thay đổi Email nhận mã</span>
                 </a>
@@ -202,8 +217,8 @@ require_once __DIR__ . '/includes/navbar.php';
                     Đặt Mật Khẩu Mới
                 </h1>
                 <p class="text-xs sm:text-sm text-slate-500 mt-1 leading-relaxed">
-                    Xác minh mã OTP và tạo mật khẩu mới cho tài khoản: 
-                    <strong class="text-indigo-600 font-semibold"><?= !empty($email) ? xss_clean($email) : 'được chỉ định' ?></strong>
+                    Xác minh mã OTP và tạo mật khẩu mới cho tài khoản:
+                    <strong class="text-indigo-600 font-semibold"><?= e(!empty($email) ? xss_clean($email) : 'được chỉ định') ?></strong>
                 </p>
             </div>
 
@@ -215,7 +230,7 @@ require_once __DIR__ . '/includes/navbar.php';
                     </div>
                     <div>
                         <span class="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-0.5">Thông báo thử nghiệm Localhost:</span>
-                        <span><?= $flashOtp ?></span>
+                        <span><?= e($flashOtp) ?></span>
                     </div>
                 </div>
             <?php endif; ?>
@@ -228,7 +243,7 @@ require_once __DIR__ . '/includes/navbar.php';
                         <span class="font-bold text-sm text-emerald-900"><?= xss_clean($success) ?></span>
                     </div>
                     <div class="pt-1">
-                        <a href="<?= BASE_URL ?>/login" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all">
+                        <a href="<?= e(BASE_URL) ?>/login" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all">
                             <span>Đăng nhập ngay bây giờ</span>
                             <i class="fa-solid fa-arrow-right text-[10px]"></i>
                         </a>
@@ -247,9 +262,9 @@ require_once __DIR__ . '/includes/navbar.php';
             <?php if (empty($success)): ?>
                 <!-- Form Đặt Lại Mật Khẩu -->
                 <form method="POST" action="" class="space-y-4">
-                    <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                    <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                     <?php if (!empty($email)): ?>
-                        <input type="hidden" name="email" value="<?= htmlspecialchars($email) ?>">
+                        <input type="hidden" name="email" value="<?= e($email) ?>">
                     <?php else: ?>
                         <div>
                             <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Email tài khoản *</label>
@@ -261,7 +276,7 @@ require_once __DIR__ . '/includes/navbar.php';
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
                             <label class="block text-xs font-bold uppercase tracking-wider text-slate-700">Mã xác thực OTP (6 chữ số) *</label>
-                            <a href="<?= BASE_URL ?>/forgot-password" class="text-[11px] font-semibold text-indigo-600 hover:underline">Gửi lại mã?</a>
+                            <a href="<?= e(BASE_URL) ?>/forgot-password" class="text-[11px] font-semibold text-indigo-600 hover:underline">Gửi lại mã?</a>
                         </div>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
@@ -280,7 +295,7 @@ require_once __DIR__ . '/includes/navbar.php';
                                 <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                                     <i class="fa-solid fa-lock text-sm"></i>
                                 </div>
-                                <input type="password" id="newPassword" name="new_password" required placeholder="Tối thiểu 6 ký tự" class="w-full pl-11 pr-11 py-3 rounded-2xl bg-slate-50/80 text-sm text-slate-900 border border-slate-200/80 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400 transition-all duration-200">
+                                <input type="password" id="newPassword" name="new_password" required placeholder="Tối thiểu 12 ký tự" class="w-full pl-11 pr-11 py-3 rounded-2xl bg-slate-50/80 text-sm text-slate-900 border border-slate-200/80 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400 transition-all duration-200">
                                 <button type="button" onclick="togglePasswordVisibility('newPassword', this)" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" title="Ẩn/Hiện mật khẩu">
                                     <i class="fa-regular fa-eye text-sm"></i>
                                 </button>
@@ -312,7 +327,7 @@ require_once __DIR__ . '/includes/navbar.php';
             <!-- Hỗ trợ thêm -->
             <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>Quay lại đăng nhập?</span>
-                <a href="<?= BASE_URL ?>/login" class="font-bold text-indigo-600 hover:underline">
+                <a href="<?= e(BASE_URL) ?>/login" class="font-bold text-indigo-600 hover:underline">
                     Đăng nhập tài khoản
                 </a>
             </div>

@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 require_once __DIR__ . '/config/config.php';
 
 // Các tham số lọc & phân trang
@@ -6,7 +7,7 @@ $keyword    = trim($_GET['q'] ?? '');
 $catSlug    = trim($_GET['slug'] ?? ($_GET['cat'] ?? ''));
 $priceRange = trim($_GET['price'] ?? 'all');
 $sortBy     = trim($_GET['sort'] ?? 'newest');
-$page       = max(1, (int)($_GET['page'] ?? 1));
+$page       = max(1, min(100000, (int)($_GET['page'] ?? 1)));
 $limit      = 12; // 12 sản phẩm để hiển thị cân đối cho cả lưới 3 cột và 4 cột
 $offset     = ($page - 1) * $limit;
 
@@ -15,9 +16,9 @@ $allCategories = [];
 $currentCategory = null;
 if ($db) {
     try {
-        $catStmt = $db->query("SELECT c.*, (SELECT COUNT(*) FROM products WHERE category_id = c.id AND status = 'active') as product_count 
-                              FROM categories c 
-                              WHERE c.status = 1 
+        $catStmt = $db->query("SELECT c.*, (SELECT COUNT(*) FROM products WHERE category_id = c.id AND status = 'active') as product_count
+                              FROM categories c
+                              WHERE c.status = 1 AND c.deleted_at IS NULL
                               ORDER BY c.sort_order ASC, c.id DESC");
         $allCategories = $catStmt->fetchAll();
 
@@ -33,13 +34,13 @@ if ($db) {
 }
 
 // Xây dựng câu truy vấn lọc sản phẩm
-$where = ["p.status = 'active'"];
+$where = ["p.status = 'active' AND p.deleted_at IS NULL AND c.deleted_at IS NULL"];
 $params = [];
 
 if (!empty($keyword)) {
-    $where[] = "(p.title LIKE ? OR p.short_desc LIKE ?)";
-    $params[] = "%$keyword%";
-    $params[] = "%$keyword%";
+    $where[] = "(p.title LIKE ? ESCAPE '!' OR p.short_desc LIKE ? ESCAPE '!')";
+    $params[] = like_pattern($keyword);
+    $params[] = like_pattern($keyword);
 }
 
 if (!empty($catSlug)) {
@@ -60,16 +61,13 @@ if ($priceRange === 'free') {
 $whereSql = implode(' AND ', $where);
 
 // Thứ tự sắp xếp
-$orderSql = "ORDER BY p.id DESC";
-if ($sortBy === 'views_desc' || $sortBy === 'views' || $sortBy === 'popular') {
-    $orderSql = "ORDER BY p.views DESC";
-} elseif ($sortBy === 'downloads_desc' || $sortBy === 'downloads') {
-    $orderSql = "ORDER BY p.download_count DESC";
-} elseif ($sortBy === 'price_asc') {
-    $orderSql = "ORDER BY COALESCE(p.sale_price, p.price) ASC";
-} elseif ($sortBy === 'price_desc') {
-    $orderSql = "ORDER BY COALESCE(p.sale_price, p.price) DESC";
-}
+$orderSql = match ($sortBy) {
+    'views_desc', 'views', 'popular' => 'ORDER BY p.views DESC',
+    'downloads_desc', 'downloads' => 'ORDER BY p.download_count DESC',
+    'price_asc' => 'ORDER BY COALESCE(p.sale_price, p.price) ASC',
+    'price_desc' => 'ORDER BY COALESCE(p.sale_price, p.price) DESC',
+    default => 'ORDER BY p.id DESC',
+};
 
 // Đếm tổng số bản ghi để phân trang
 $totalProducts = 0;
@@ -81,14 +79,17 @@ if ($db) {
         $cStmt->execute($params);
         $totalProducts = (int)$cStmt->fetchColumn();
 
-        $sql = "SELECT p.*, c.name as category_name, c.slug as category_slug 
-                FROM products p 
-                JOIN categories c ON p.category_id = c.id 
-                WHERE $whereSql 
-                $orderSql 
-                LIMIT $limit OFFSET $offset";
+        $sql = "SELECT p.*, c.name as category_name, c.slug as category_slug
+                FROM products p
+                JOIN categories c ON p.category_id = c.id
+                WHERE $whereSql
+                $orderSql
+                LIMIT ? OFFSET ?";
         $pStmt = $db->prepare($sql);
-        $pStmt->execute($params);
+        foreach ($params as $position => $parameter) { $pStmt->bindValue($position + 1, $parameter, PDO::PARAM_STR); }
+        $pStmt->bindValue(count($params) + 1, $limit, PDO::PARAM_INT);
+        $pStmt->bindValue(count($params) + 2, $offset, PDO::PARAM_INT);
+        $pStmt->execute();
         $products = $pStmt->fetchAll();
     } catch (Exception $e) {}
 }
@@ -263,12 +264,12 @@ require_once __DIR__ . '/includes/navbar.php';
                     Kho Mã Nguồn
                 </h1>
                 <span class="bg-slate-100 text-slate-600 text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
-                    <span id="productTotalBadge" class="counter-val font-bold" data-target="<?= (int)$totalProducts ?>"><?= number_format($totalProducts) ?></span> sản phẩm
+                    <span id="productTotalBadge" class="counter-val font-bold" data-target="<?= e((int)$totalProducts) ?>"><?= e(number_format((float)($totalProducts))) ?></span> sản phẩm
                 </span>
             </div>
 
             <!-- Bên phải: Ô Tìm Kiếm + Dropdown Giá + Dropdown Sắp Xếp (CÙNG MỘT HÀNG NGANG) -->
-            <form id="filterForm" method="GET" action="<?= BASE_URL ?>/categories" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
+            <form id="filterForm" method="GET" action="<?= e(BASE_URL) ?>/categories" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
                 <?php if (!empty($catSlug)): ?>
                     <input type="hidden" name="slug" value="<?= xss_clean($catSlug) ?>">
                 <?php endif; ?>
@@ -278,7 +279,7 @@ require_once __DIR__ . '/includes/navbar.php';
                     <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                     <input type="text" name="q" value="<?= xss_clean($keyword) ?>" placeholder="Tìm tên mã nguồn, công nghệ..." autocomplete="off" class="w-full pl-9 pr-8 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs">
                     <?php if (!empty($keyword)): ?>
-                        <a href="<?= filter_url(['q' => null]) ?>" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" title="Xóa tìm kiếm">
+                        <a href="<?= e(safe_url(filter_url(['q' => null]))) ?>" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" title="Xóa tìm kiếm">
                             <i class="fa-solid fa-xmark text-xs"></i>
                         </a>
                     <?php endif; ?>
@@ -286,32 +287,32 @@ require_once __DIR__ . '/includes/navbar.php';
 
                 <!-- Dropdown Chọn Khoảng Giá -->
                 <select name="price" class="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs cursor-pointer">
-                    <option value="all" <?= $priceRange === 'all' ? 'selected' : '' ?>>Tất cả mức giá</option>
-                    <option value="free" <?= $priceRange === 'free' ? 'selected' : '' ?>>Miễn phí</option>
-                    <option value="under_200" <?= $priceRange === 'under_200' ? 'selected' : '' ?>>Dưới 200k</option>
-                    <option value="200_500" <?= $priceRange === '200_500' ? 'selected' : '' ?>>200k - 500k</option>
-                    <option value="above_500" <?= $priceRange === 'above_500' ? 'selected' : '' ?>>Trên 500k</option>
+                    <option value="all" <?= e($priceRange === 'all' ? 'selected' : '') ?>>Tất cả mức giá</option>
+                    <option value="free" <?= e($priceRange === 'free' ? 'selected' : '') ?>>Miễn phí</option>
+                    <option value="under_200" <?= e($priceRange === 'under_200' ? 'selected' : '') ?>>Dưới 200k</option>
+                    <option value="200_500" <?= e($priceRange === '200_500' ? 'selected' : '') ?>>200k - 500k</option>
+                    <option value="above_500" <?= e($priceRange === 'above_500' ? 'selected' : '') ?>>Trên 500k</option>
                 </select>
 
                 <!-- Dropdown Sắp Xếp -->
                 <select name="sort" class="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs cursor-pointer">
-                    <option value="newest" <?= $sortBy === 'newest' ? 'selected' : '' ?>>Mới nhất</option>
-                    <option value="views_desc" <?= ($sortBy === 'views_desc' || $sortBy === 'views' || $sortBy === 'popular') ? 'selected' : '' ?>>Xem nhiều</option>
-                    <option value="downloads_desc" <?= ($sortBy === 'downloads_desc') ? 'selected' : '' ?>>Tải nhiều</option>
-                    <option value="price_asc" <?= $sortBy === 'price_asc' ? 'selected' : '' ?>>Giá tăng dần</option>
-                    <option value="price_desc" <?= $sortBy === 'price_desc' ? 'selected' : '' ?>>Giá giảm dần</option>
+                    <option value="newest" <?= e($sortBy === 'newest' ? 'selected' : '') ?>>Mới nhất</option>
+                    <option value="views_desc" <?= e(($sortBy === 'views_desc' || $sortBy === 'views' || $sortBy === 'popular') ? 'selected' : '') ?>>Xem nhiều</option>
+                    <option value="downloads_desc" <?= e(($sortBy === 'downloads_desc') ? 'selected' : '') ?>>Tải nhiều</option>
+                    <option value="price_asc" <?= e($sortBy === 'price_asc' ? 'selected' : '') ?>>Giá tăng dần</option>
+                    <option value="price_desc" <?= e($sortBy === 'price_desc' ? 'selected' : '') ?>>Giá giảm dần</option>
                 </select>
             </form>
         </div>
 
         <!-- 5. Thanh Chuyên Mục Ngang (Horizontal Category Pills với Sequential Delay) -->
         <div id="categoryPills" class="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-            <a href="<?= filter_url(['slug' => null]) ?>" style="--i: 0;" class="category-pill-item <?= empty($catSlug) ? 'bg-slate-900 text-white font-medium px-4 py-2 rounded-full text-sm shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 px-4 py-2 rounded-full text-sm whitespace-nowrap' ?> shrink-0">
+            <a href="<?= e(safe_url(filter_url(['slug' => null]))) ?>" style="--i: 0;" class="category-pill-item <?= e(empty($catSlug) ? 'bg-slate-900 text-white font-medium px-4 py-2 rounded-full text-sm shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 px-4 py-2 rounded-full text-sm whitespace-nowrap') ?> shrink-0">
                 Tất cả
             </a>
             <?php foreach ($allCategories as $cIdx => $cat): ?>
                 <?php $isCatActive = ($catSlug === $cat['slug']); ?>
-                <a href="<?= filter_url(['slug' => $cat['slug']]) ?>" style="--i: <?= $cIdx + 1 ?>;" class="category-pill-item <?= $isCatActive ? 'bg-slate-900 text-white font-medium px-4 py-2 rounded-full text-sm shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 px-4 py-2 rounded-full text-sm whitespace-nowrap' ?> shrink-0">
+                <a href="<?= e(safe_url(filter_url(['slug' => $cat['slug']]))) ?>" style="--i: <?= e($cIdx + 1) ?>;" class="category-pill-item <?= e($isCatActive ? 'bg-slate-900 text-white font-medium px-4 py-2 rounded-full text-sm shadow-sm' : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 px-4 py-2 rounded-full text-sm whitespace-nowrap') ?> shrink-0">
                     <?= xss_clean($cat['name']) ?>
                 </a>
             <?php endforeach; ?>
@@ -321,7 +322,7 @@ require_once __DIR__ . '/includes/navbar.php';
     <!-- 2 & 3. FULL-WIDTH PRODUCT GRID & PAGINATION AREA (SMOOTH AJAX CONTAINER) -->
     <div id="productContainer" class="space-y-6">
         <?php if (!empty($products)): ?>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div class="responsive-card-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 <?php foreach ($products as $idx => $p): ?>
                     <?php
                     $curPrice = !empty($p['sale_price']) && $p['sale_price'] > 0 ? (float)$p['sale_price'] : (float)$p['price'];
@@ -329,11 +330,11 @@ require_once __DIR__ . '/includes/navbar.php';
                     $discountPct = $discount ? round((($p['price'] - $p['sale_price']) / $p['price']) * 100) : 0;
                     ?>
                     <!-- Product Card Chuẩn Gumroad / Tailwind UI -->
-                    <div class="product-card group bg-white rounded-2xl border border-slate-200/80 overflow-hidden flex flex-col" style="--ci: <?= ($idx % 4) + 1 ?>;">
+                    <div class="product-card group bg-white rounded-2xl border border-slate-200/80 overflow-hidden flex flex-col" style="--ci: <?= e(($idx % 4) + 1) ?>;">
                         <!-- Phần Ảnh (aspect-[16/10]) -->
-                        <a href="<?= BASE_URL ?>/product?id=<?= $p['id'] ?>" class="product-thumb-container aspect-[16/10] bg-slate-100 block">
-                            <img src="<?= xss_clean($p['thumbnail']) ?>" alt="<?= xss_clean($p['title']) ?>" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='<?= BASE_URL ?>/assets/images/default-code.jpg';">
-                            
+                        <a href="<?= e(BASE_URL) ?>/product?id=<?= e(public_reference('products', (int)$p['id'])) ?>" class="product-thumb-container aspect-[16/10] bg-slate-100 block">
+                            <img src="<?= e(safe_url($p['thumbnail'])) ?>" alt="<?= xss_clean($p['title']) ?>" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='<?= e(BASE_URL) ?>/assets/images/default-code.jpg';">
+
                             <!-- Góc trên bên trái ảnh: Badge tên danh mục gọn gàng -->
                             <span class="absolute top-2.5 left-2.5 bg-slate-900/75 backdrop-blur-md text-white text-[11px] font-medium px-2.5 py-1 rounded-lg z-20 truncate max-w-[140px]">
                                 <?= xss_clean($p['category_name'] ?? 'Mã Nguồn') ?>
@@ -342,7 +343,7 @@ require_once __DIR__ . '/includes/navbar.php';
                             <!-- Góc trên bên phải ảnh: Badge giảm giá nếu có -->
                             <?php if ($discount): ?>
                                 <span class="absolute top-2.5 right-2.5 bg-rose-500 text-white text-[11px] font-bold px-2 py-1 rounded-lg z-20 shadow-sm">
-                                    -<?= $discountPct ?>%
+                                    -<?= e($discountPct) ?>%
                                 </span>
                             <?php endif; ?>
                         </a>
@@ -352,7 +353,7 @@ require_once __DIR__ . '/includes/navbar.php';
                             <div>
                                 <!-- Tiêu đề (gọn gàng line-clamp-1) -->
                                 <h3 class="text-[15px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
-                                    <a href="<?= BASE_URL ?>/product?id=<?= $p['id'] ?>" title="<?= xss_clean($p['title']) ?>">
+                                    <a href="<?= e(BASE_URL) ?>/product?id=<?= e(public_reference('products', (int)$p['id'])) ?>" title="<?= xss_clean($p['title']) ?>">
                                         <?= xss_clean($p['title']) ?>
                                     </a>
                                 </h3>
@@ -368,11 +369,11 @@ require_once __DIR__ . '/includes/navbar.php';
                                 <div class="flex items-center gap-4 mt-3 text-xs text-slate-500 font-medium">
                                     <span class="inline-flex items-center gap-1.5" title="Lượt xem">
                                         <i class="fa-regular fa-eye text-slate-400"></i>
-                                        <span class="counter-val" data-target="<?= (int)($p['views'] ?? $p['view_count'] ?? 0) ?>"><?= number_format((int)($p['views'] ?? $p['view_count'] ?? 0)) ?></span> lượt xem
+                                        <span class="counter-val" data-target="<?= e((int)($p['views'] ?? $p['view_count'] ?? 0)) ?>"><?= e(number_format((float)((int)($p['views'] ?? $p['view_count'] ?? 0)))) ?></span> lượt xem
                                     </span>
                                     <span class="inline-flex items-center gap-1.5" title="Lượt tải">
                                         <i class="fa-solid fa-download text-slate-400"></i>
-                                        <span class="counter-val" data-target="<?= (int)$p['download_count'] ?>"><?= number_format((int)$p['download_count']) ?></span> lượt tải
+                                        <span class="counter-val" data-target="<?= e((int)$p['download_count']) ?>"><?= e(number_format((float)((int)$p['download_count']))) ?></span> lượt tải
                                     </span>
                                 </div>
                             </div>
@@ -383,18 +384,18 @@ require_once __DIR__ . '/includes/navbar.php';
                                 <div class="flex flex-col justify-center min-w-0 leading-none">
                                     <?php if ($discount && $p['price'] > 0): ?>
                                         <span class="text-[11px] font-medium text-slate-400 line-through mb-1 whitespace-nowrap">
-                                            <?= number_format($p['price'], 0, ',', '.') ?>đ
+                                            <?= e(number_format((float)($p['price']), 0, ',', '.')) ?>đ
                                         </span>
                                     <?php else: ?>
                                         <span class="text-[11px] text-transparent mb-1 select-none leading-none whitespace-nowrap" aria-hidden="true">&nbsp;</span>
                                     <?php endif; ?>
                                     <span class="text-[17px] font-extrabold text-indigo-600 tracking-tight whitespace-nowrap">
-                                        <?= $curPrice <= 0 ? 'Miễn phí' : number_format($curPrice, 0, ',', '.') . 'đ' ?>
+                                        <?= e($curPrice <= 0 ? 'Miễn phí' : number_format((float)($curPrice), 0, ',', '.') . 'đ') ?>
                                     </span>
                                 </div>
 
                                 <!-- Bên phải: Nút bấm gọn gàng không rớt dòng -->
-                                <a href="<?= BASE_URL ?>/product?id=<?= $p['id'] ?>" class="product-detail-btn shrink-0 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all duration-300 inline-flex items-center gap-1.5 whitespace-nowrap">
+                                <a href="<?= e(BASE_URL) ?>/product?id=<?= e(public_reference('products', (int)$p['id'])) ?>" class="product-detail-btn shrink-0 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all duration-300 inline-flex items-center gap-1.5 whitespace-nowrap">
                                     <span>Chi tiết</span>
                                     <i class="product-detail-arrow fa-solid fa-arrow-right text-[10px]"></i>
                                 </a>
@@ -408,19 +409,19 @@ require_once __DIR__ . '/includes/navbar.php';
             <?php if ($totalPages > 1): ?>
                 <div class="flex items-center justify-center gap-2 pt-6">
                     <?php if ($page > 1): ?>
-                        <a href="<?= filter_url(['page' => $page - 1]) ?>" class="pagination-btn px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all active:scale-[0.97] shadow-2xs flex items-center gap-1">
+                        <a href="<?= e(safe_url(filter_url(['page' => $page - 1]))) ?>" class="pagination-btn px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all active:scale-[0.97] shadow-2xs flex items-center gap-1">
                             <i class="fa-solid fa-chevron-left text-[10px]"></i> Trang trước
                         </a>
                     <?php endif; ?>
 
                     <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                        <a href="<?= filter_url(['page' => $i]) ?>" class="pagination-btn w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all <?= $page === $i ? 'bg-slate-900 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50' ?> active:scale-[0.97] shadow-2xs">
-                            <?= $i ?>
+                        <a href="<?= e(safe_url(filter_url(['page' => $i]))) ?>" class="pagination-btn w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all <?= e($page === $i ? 'bg-slate-900 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50') ?> active:scale-[0.97] shadow-2xs">
+                            <?= e($i) ?>
                         </a>
                     <?php endfor; ?>
 
                     <?php if ($page < $totalPages): ?>
-                        <a href="<?= filter_url(['page' => $page + 1]) ?>" class="pagination-btn px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all active:scale-[0.97] shadow-2xs flex items-center gap-1">
+                        <a href="<?= e(safe_url(filter_url(['page' => $page + 1]))) ?>" class="pagination-btn px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-all active:scale-[0.97] shadow-2xs flex items-center gap-1">
                             Trang sau <i class="fa-solid fa-chevron-right text-[10px]"></i>
                         </a>
                     <?php endif; ?>
@@ -435,7 +436,7 @@ require_once __DIR__ . '/includes/navbar.php';
                 </div>
                 <h3 class="text-base font-bold text-slate-900">Không Tìm Thấy Mã Nguồn Phù Hợp</h3>
                 <p class="text-xs text-slate-500 leading-relaxed">Hiện tại không có mã nguồn nào khớp với tiêu chí tìm kiếm hoặc bộ lọc bạn đã chọn.</p>
-                <a href="<?= BASE_URL ?>/categories" class="pagination-btn inline-block px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-bold text-xs shadow-sm transition-all active:scale-[0.97]">
+                <a href="<?= e(BASE_URL) ?>/categories" class="pagination-btn inline-block px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white font-bold text-xs shadow-sm transition-all active:scale-[0.97]">
                     Xóa Bộ Lọc & Xem Tất Cả
                 </a>
             </div>
@@ -453,26 +454,26 @@ function animateCounters(root = document) {
     counters.forEach(counter => {
         const target = parseInt(counter.getAttribute('data-target') || '0', 10);
         if (isNaN(target)) return;
-        
+
         const duration = 800;
         const startTime = performance.now();
-        
+
         function updateCounter(currentTime) {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
             // Cubic ease-out
             const easeProgress = 1 - Math.pow(1 - progress, 3);
             const currentVal = Math.floor(easeProgress * target);
-            
+
             counter.textContent = new Intl.NumberFormat('vi-VN').format(currentVal);
-            
+
             if (progress < 1) {
                 requestAnimationFrame(updateCounter);
             } else {
                 counter.textContent = new Intl.NumberFormat('vi-VN').format(target);
             }
         }
-        
+
         requestAnimationFrame(updateCounter);
     });
 }
@@ -515,10 +516,10 @@ function animateCounters(root = document) {
                 if (newContainer) {
                     productContainer.innerHTML = newContainer.innerHTML;
                     productContainer.classList.remove('is-loading');
-                    
+
                     // Kích hoạt lại hiệu ứng đếm số cho các thẻ mới
                     animateCounters(productContainer);
-                    
+
                     // Gắn lại sự kiện cho các nút phân trang
                     attachPaginationEvents();
                 }
@@ -603,7 +604,7 @@ function animateCounters(root = document) {
         if (!filterForm) return;
         const formData = new FormData(filterForm);
         const params = new URLSearchParams();
-        
+
         for (const [k, v] of formData.entries()) {
             if (v && v !== 'all' && v !== 'newest') {
                 params.set(k, v);

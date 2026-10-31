@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 // Xóa bytecode cache và chống lưu cache trình duyệt
 if (function_exists('opcache_reset')) {
     @opcache_reset();
@@ -91,21 +92,21 @@ if ($db) {
         }
 
         // 7. 5 Đơn hàng mua code mới nhất
-        $oStmt = $db->query("SELECT o.*, u.username, p.title as product_title 
-                             FROM orders o 
-                             JOIN users u ON o.user_id = u.id 
-                             JOIN products p ON o.product_id = p.id 
+        $oStmt = $db->query("SELECT o.*, u.username, p.title as product_title
+                             FROM orders o
+                             JOIN users u ON o.user_id = u.id
+                             JOIN products p ON o.product_id = p.id
                              ORDER BY o.id DESC LIMIT 5");
         $recentOrders = $oStmt->fetchAll();
 
         // 8. 5 Giao dịch nạp tiền MoMo & Thẻ cào mới nhất
         $tStmt = $db->query("
-            (SELECT b.id, b.trans_id, b.amount, b.created_at, b.status, u.username, 'MoMo' as channel 
-             FROM bank_transactions b 
+            (SELECT b.id, b.trans_id, b.amount, b.created_at, b.status, u.username, 'MoMo' as channel
+             FROM bank_transactions b
              JOIN users u ON b.user_id = u.id)
             UNION ALL
-            (SELECT c.id, c.trans_id, c.received_amount as amount, c.created_at, c.status, u.username, 'Card' as channel 
-             FROM card_transactions c 
+            (SELECT c.id, c.trans_id, c.received_amount as amount, c.created_at, c.status, u.username, 'Card' as channel
+             FROM card_transactions c
              JOIN users u ON c.user_id = u.id)
             ORDER BY created_at DESC LIMIT 5
         ");
@@ -132,7 +133,7 @@ $totalChart7Days = array_sum($chartDataValues);
         </div>
         <div>
             <div class="text-2xl font-extrabold text-slate-900 tracking-tight">
-                <?= number_format($totalRevenue, 0, ',', '.') ?> đ
+                <?= e(number_format((float)($totalRevenue), 0, ',', '.')) ?> đ
             </div>
             <p class="text-[11px] font-medium text-slate-400 mt-1 flex items-center gap-1">
                 <i class="fa-solid fa-bolt text-emerald-500 text-[10px]"></i>
@@ -151,11 +152,11 @@ $totalChart7Days = array_sum($chartDataValues);
         </div>
         <div>
             <div class="text-2xl font-extrabold text-indigo-600 tracking-tight">
-                +<?= number_format($revenueToday, 0, ',', '.') ?> đ
+                +<?= e(number_format((float)($revenueToday), 0, ',', '.')) ?> đ
             </div>
             <p class="text-[11px] font-medium text-slate-400 mt-1 flex items-center gap-1 truncate">
                 <span class="text-indigo-600 font-bold">Tháng này:</span>
-                <span>+<?= number_format($revenueMonth, 0, ',', '.') ?> đ</span>
+                <span>+<?= e(number_format((float)($revenueMonth), 0, ',', '.')) ?> đ</span>
             </p>
         </div>
     </div>
@@ -170,12 +171,12 @@ $totalChart7Days = array_sum($chartDataValues);
         </div>
         <div>
             <div class="text-2xl font-extrabold text-slate-900 tracking-tight">
-                <?= number_format($totalOrders) ?>
+                <?= e(number_format((float)($totalOrders))) ?>
             </div>
             <div class="mt-1">
                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
                     <i class="fa-solid fa-circle-check text-[9px]"></i>
-                    <?= number_format($totalOrders) ?> đơn hoàn tất
+                    <?= e(number_format((float)($totalOrders))) ?> đơn hoàn tất
                 </span>
             </div>
         </div>
@@ -191,12 +192,12 @@ $totalChart7Days = array_sum($chartDataValues);
         </div>
         <div>
             <div class="text-2xl font-extrabold text-slate-900 tracking-tight">
-                <?= number_format($totalUsers) ?>
+                <?= e(number_format((float)($totalUsers))) ?>
             </div>
             <div class="mt-1">
                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <?= number_format($totalUsers) ?> tài khoản active
+                    <?= e(number_format((float)($totalUsers))) ?> tài khoản active
                 </span>
             </div>
         </div>
@@ -222,7 +223,7 @@ $totalChart7Days = array_sum($chartDataValues);
             <div class="flex items-center gap-2 self-start sm:self-auto">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
                     <i class="fa-solid fa-arrow-trend-up text-xs"></i>
-                    <span>+<?= number_format($totalChart7Days, 0, ',', '.') ?> đ</span>
+                    <span>+<?= e(number_format((float)($totalChart7Days), 0, ',', '.')) ?> đ</span>
                 </span>
             </div>
         </div>
@@ -245,13 +246,13 @@ $totalChart7Days = array_sum($chartDataValues);
                         </span>
                         <span>Đơn Mua Mã Nguồn Mới</span>
                     </h3>
-                    <a href="<?= BASE_URL ?>/admin/orders" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                    <a href="<?= e(BASE_URL) ?>/admin/orders" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
                         <span>Xem tất cả</span>
                         <i class="fa-solid fa-arrow-right text-[10px]"></i>
                     </a>
                 </div>
                 <div class="w-full overflow-x-auto">
-                    <table class="w-full min-w-[460px] text-left text-xs border-collapse">
+                    <div class="responsive-table" role="region" aria-label="Bảng dữ liệu, cuộn ngang khi cần" tabindex="0"><table data-responsive="wide" class="w-full min-w-[460px] text-left text-xs border-collapse">
                         <thead>
                             <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase bg-slate-50/30">
                                 <th class="py-2.5 px-3.5 whitespace-nowrap">Mã Đơn</th>
@@ -274,7 +275,7 @@ $totalChart7Days = array_sum($chartDataValues);
                                             <?= xss_clean($ro['product_title']) ?>
                                         </td>
                                         <td class="py-2.5 px-3.5 font-extrabold text-slate-900 text-right whitespace-nowrap">
-                                            <?= number_format($ro['price'], 0, ',', '.') ?> đ
+                                            <?= e(number_format((float)($ro['price']), 0, ',', '.')) ?> đ
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -287,7 +288,7 @@ $totalChart7Days = array_sum($chartDataValues);
                                 </tr>
                             <?php endif; ?>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
             </div>
         </div>
@@ -302,13 +303,13 @@ $totalChart7Days = array_sum($chartDataValues);
                         </span>
                         <span>Giao Dịch Nạp Tiền Mới</span>
                     </h3>
-                    <a href="<?= BASE_URL ?>/admin/deposits" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                    <a href="<?= e(BASE_URL) ?>/admin/deposits" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
                         <span>Xem tất cả</span>
                         <i class="fa-solid fa-arrow-right text-[10px]"></i>
                     </a>
                 </div>
                 <div class="w-full overflow-x-auto">
-                    <table class="w-full min-w-[460px] text-left text-xs border-collapse">
+                    <div class="responsive-table" role="region" aria-label="Bảng dữ liệu, cuộn ngang khi cần" tabindex="0"><table data-responsive="wide" class="w-full min-w-[460px] text-left text-xs border-collapse">
                         <thead>
                             <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase bg-slate-50/30">
                                 <th class="py-2.5 px-3.5 whitespace-nowrap">Mã GD</th>
@@ -342,10 +343,10 @@ $totalChart7Days = array_sum($chartDataValues);
                                             <?= xss_clean($rt['username']) ?>
                                         </td>
                                         <td class="py-2.5 px-3.5 font-extrabold text-emerald-600 text-right whitespace-nowrap">
-                                            +<?= number_format($rt['amount'], 0, ',', '.') ?> đ
+                                            +<?= e(number_format((float)($rt['amount']), 0, ',', '.')) ?> đ
                                         </td>
                                         <td class="py-2.5 px-3.5 text-slate-400 text-right whitespace-nowrap">
-                                            <?= date('H:i d/m', strtotime($rt['created_at'])) ?>
+                                            <?= e(date('H:i d/m', strtotime($rt['created_at']))) ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -358,7 +359,7 @@ $totalChart7Days = array_sum($chartDataValues);
                                 </tr>
                             <?php endif; ?>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
             </div>
         </div>

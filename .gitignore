@@ -1,0 +1,5 @@
+/config/security.local.php
+/config/database.local.php
+/storage/rate-limits/
+/delivery/
+*.log

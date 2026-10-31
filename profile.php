@@ -1,6 +1,8 @@
 <?php
+declare(strict_types=1);
 $pageTitle = "Trang Cá Nhân & Quản Lý Tài Khoản - MarketCode";
 require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/includes/passwords.php';
 require_login();
 
 $user = current_user();
@@ -38,30 +40,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_profile'])) {
         $error = 'Mã bảo mật CSRF Token không hợp lệ!';
     } else {
         $fullname = trim($_POST['fullname'] ?? '');
-        $avatar = trim($_POST['avatar'] ?? ($user['avatar'] ?? ''));
+        $avatar = $user['avatar'] ?? ''; // Only the authenticated upload pipeline may change this path.
 
-        if (!empty($_FILES['avatar_file']['name']) && $_FILES['avatar_file']['error'] === UPLOAD_ERR_OK) {
-            $allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-            $fileInfo = pathinfo($_FILES['avatar_file']['name']);
-            $ext = strtolower($fileInfo['extension'] ?? '');
-
-            if (!in_array($ext, $allowedExts)) {
-                $error = 'Định dạng ảnh không hợp lệ! Chỉ chấp nhận JPG, PNG, WEBP, GIF.';
-            } elseif ($_FILES['avatar_file']['size'] > 5 * 1024 * 1024) {
-                $error = 'Kích thước file ảnh không được vượt quá 5MB!';
-            } else {
-                $uploadDir = ROOT_PATH . '/assets/uploads/avatars';
-                if (!is_dir($uploadDir)) {
-                    @mkdir($uploadDir, 0755, true);
-                }
-                $newFileName = 'avatar_' . $user['id'] . '_' . time() . '.' . $ext;
-                $destination = $uploadDir . '/' . $newFileName;
-
-                if (move_uploaded_file($_FILES['avatar_file']['tmp_name'], $destination)) {
-                    $avatar = 'assets/uploads/avatars/' . $newFileName;
-                } else {
-                    $error = 'Không thể lưu file ảnh tải lên máy chủ!';
-                }
+        if (!empty($_FILES['avatar_file']['name'])) {
+            try {
+                $name = store_uploaded_image($_FILES['avatar_file'], ROOT_PATH . '/assets/uploads/avatars');
+                $avatar = 'assets/uploads/avatars/' . $name;
+            } catch (Throwable $uploadError) {
+                $error = $uploadError instanceof InvalidArgumentException ? $uploadError->getMessage() : public_error($uploadError);
             }
         }
 
@@ -75,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_profile'])) {
                     $success = 'Cập nhật thông tin cá nhân & ảnh đại diện thành công!';
                     $user = current_user(); // Refresh
                 } catch (Exception $e) {
-                    $error = 'Lỗi cập nhật: ' . $e->getMessage();
+                    $error = 'Lỗi cập nhật: ' . public_error($e);
                 }
             }
         }
@@ -93,26 +79,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_password'])) {
 
         if (empty($oldPass) || empty($newPass) || empty($confirmPass)) {
             $error = 'Vui lòng điền đầy đủ các thông tin mật khẩu!';
-        } elseif (strlen($newPass) < 6) {
-            $error = 'Mật khẩu mới phải có tối thiểu 6 ký tự!';
-        } elseif ($newPass !== $confirmPass) {
+        } elseif (strlen($newPass) < 12 || strlen($newPass) > 1024) {
+            $error = 'Mật khẩu mới phải có từ 12 đến 1024 ký tự!';
+        } elseif (!hash_equals($newPass, $confirmPass)) {
             $error = 'Mật khẩu xác nhận không trùng khớp!';
         } else {
             try {
-                $stmt = $db->prepare("SELECT password FROM users WHERE id = ? LIMIT 1");
+                $db->beginTransaction();
+                $stmt = $db->prepare("SELECT password FROM users WHERE id = ? LIMIT 1 FOR UPDATE");
                 $stmt->execute([$user['id']]);
                 $currentHash = $stmt->fetchColumn();
 
-                if (!password_verify($oldPass, $currentHash)) {
+                if (!app_password_verify($oldPass, (string)$currentHash)) {
+                    $db->rollBack();
                     $error = 'Mật khẩu hiện tại không chính xác!';
                 } else {
-                    $newHash = password_hash($newPass, PASSWORD_BCRYPT);
+                    $newHash = app_password_hash($newPass);
                     $upPass = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
                     $upPass->execute([$newHash, $user['id']]);
+                    $db->commit();
+                    session_regenerate_id(true);
+                    $_SESSION['auth_password_tag'] = hash('sha256', $newHash);
                     $success = 'Đổi mật khẩu thành công! Vui lòng ghi nhớ mật khẩu mới.';
                 }
-            } catch (Exception $e) {
-                $error = 'Lỗi đổi mật khẩu: ' . $e->getMessage();
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) { $db->rollBack(); }
+                $error = 'Lỗi đổi mật khẩu: ' . public_error($e);
             }
         }
     }
@@ -162,7 +154,7 @@ require_once __DIR__ . '/includes/navbar.php';
 }
 </style>
 
-<?php if (!empty($success) || !empty($error)): 
+<?php if (!empty($success) || !empty($error)):
     $isSuccess  = !empty($success);
     $toastTitle = $isSuccess ? 'Thành công!' : 'Có lỗi xảy ra!';
     $toastMsg   = $isSuccess ? $success : $error;
@@ -173,12 +165,12 @@ require_once __DIR__ . '/includes/navbar.php';
 <!-- Floating Toast Notification (Vercel / Sonner Style) -->
 <div id="floatingToast" class="fixed top-24 right-6 z-[9999] max-w-sm w-full bg-white/95 backdrop-blur-xl border border-slate-200/80 rounded-2xl p-4 shadow-[0_20px_50px_rgba(15,23,42,0.15)] flex items-start gap-3.5 overflow-hidden toast-enter">
     <!-- Icon bên trái -->
-    <div class="w-9 h-9 rounded-xl <?= $toastBg ?> flex items-center justify-center text-base shrink-0 shadow-2xs">
-        <i class="<?= $toastIcon ?>"></i>
+    <div class="w-9 h-9 rounded-xl <?= e($toastBg) ?> flex items-center justify-center text-base shrink-0 shadow-2xs">
+        <i class="<?= e($toastIcon) ?>"></i>
     </div>
     <!-- Nội dung ở giữa -->
     <div class="flex-1 min-w-0 pr-1">
-        <h4 class="text-sm font-extrabold text-slate-900 leading-tight"><?= $toastTitle ?></h4>
+        <h4 class="text-sm font-extrabold text-slate-900 leading-tight"><?= e($toastTitle) ?></h4>
         <p class="text-xs text-slate-600 mt-0.5 leading-relaxed"><?= xss_clean($toastMsg) ?></p>
     </div>
     <!-- Nút tắt bên phải -->
@@ -186,7 +178,7 @@ require_once __DIR__ . '/includes/navbar.php';
         <i class="fa-solid fa-xmark text-sm"></i>
     </button>
     <!-- Thanh tiến trình mảnh dưới đáy -->
-    <div class="absolute bottom-0 left-0 h-1 <?= $toastBar ?> toast-progress-bar"></div>
+    <div class="absolute bottom-0 left-0 h-1 <?= e($toastBar) ?> toast-progress-bar"></div>
 </div>
 <?php endif; ?>
 
@@ -197,7 +189,7 @@ require_once __DIR__ . '/includes/navbar.php';
     <!-- 1. UNIFIED PROFILE BANNER CARD (HEADER & 3 CHỈ SỐ)    -->
     <!-- ===================================================== -->
     <div class="bg-white rounded-2xl border border-slate-200/80 p-5 mb-5 shadow-sm flex flex-col lg:flex-row items-center justify-between gap-5">
-        
+
         <!-- Bên trái: Avatar Tương Tác + Tên + Vai trò -->
         <div class="flex items-center gap-4 w-full lg:w-auto">
             <!-- Vòng tròn Avatar tương tác gọn gàng -->
@@ -205,9 +197,9 @@ require_once __DIR__ . '/includes/navbar.php';
                 <img id="bannerAvatarImg"
                      src="<?= xss_clean(get_user_avatar($user)) ?>"
                      alt="Avatar"
-                     onerror="this.onerror=null;this.src='https://ui-avatars.com/api/?name=<?= urlencode($user['username']) ?>&background=4f46e5&color=fff&bold=true';"
+                     onerror="this.onerror=null;this.src='<?= e(BASE_URL) ?>/assets/images/default-avatar.svg';"
                      class="w-14 h-14 rounded-xl object-cover ring-2 ring-indigo-50 border border-slate-200/80 shadow-2xs transition-transform duration-200 group-hover:scale-105">
-                
+
                 <!-- Overlay mờ khi hover -->
                 <div class="absolute inset-0 rounded-xl bg-slate-900/60 backdrop-blur-xs text-white text-[10px] font-bold flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <i class="fa-solid fa-camera text-xs mb-0.5"></i>
@@ -229,12 +221,12 @@ require_once __DIR__ . '/includes/navbar.php';
                     <?php if ($user['role'] === 'admin'): ?>
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
                             <i class="fa-solid fa-shield-halved text-[9px]"></i>
-                            <?= $userRoleText ?>
+                            <?= e($userRoleText) ?>
                         </span>
                     <?php else: ?>
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                             <i class="fa-solid fa-circle-check text-[9px]"></i>
-                            <?= $userRoleText ?>
+                            <?= e($userRoleText) ?>
                         </span>
                     <?php endif; ?>
                 </div>
@@ -255,7 +247,7 @@ require_once __DIR__ . '/includes/navbar.php';
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 </div>
                 <div class="text-base font-extrabold text-indigo-600 tracking-tight">
-                    <?= number_format($user['balance'], 0, ',', '.') ?> đ
+                    <?= e(number_format((float)($user['balance']), 0, ',', '.')) ?> đ
                 </div>
             </div>
 
@@ -266,7 +258,7 @@ require_once __DIR__ . '/includes/navbar.php';
                     <i class="fa-solid fa-arrow-trend-up text-[10px] text-emerald-500"></i>
                 </div>
                 <div class="text-base font-extrabold text-emerald-600 tracking-tight">
-                    <?= number_format($totalDeposited, 0, ',', '.') ?> đ
+                    <?= e(number_format((float)($totalDeposited), 0, ',', '.')) ?> đ
                 </div>
             </div>
 
@@ -277,7 +269,7 @@ require_once __DIR__ . '/includes/navbar.php';
                     <i class="fa-solid fa-bag-shopping text-[10px] text-slate-400"></i>
                 </div>
                 <div class="text-base font-extrabold text-slate-900 tracking-tight">
-                    <?= number_format($totalBought) ?> <span class="text-xs font-semibold text-slate-500">bộ code</span>
+                    <?= e(number_format((float)($totalBought))) ?> <span class="text-xs font-semibold text-slate-500">bộ code</span>
                 </div>
             </div>
         </div>
@@ -294,7 +286,7 @@ require_once __DIR__ . '/includes/navbar.php';
         <div class="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm flex flex-col justify-between">
             <form method="POST" action="" enctype="multipart/form-data" id="profileForm" class="flex flex-col justify-between h-full space-y-4">
                 <input type="hidden" name="action_profile" value="1">
-                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                 <input type="hidden" name="avatar" value="<?= xss_clean($user['avatar']) ?>">
 
                 <!-- Phần trên: Tiêu đề + 3 Hàng nhập liệu gọn gàng -->
@@ -328,7 +320,7 @@ require_once __DIR__ . '/includes/navbar.php';
                             </label>
                             <div class="relative">
                                 <i class="fa-solid fa-shield-halved absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                                <input type="text" value="<?= strtoupper($user['role']) ?>" disabled class="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-50 text-xs sm:text-sm font-bold text-slate-500 border border-slate-200/80 cursor-not-allowed">
+                                <input type="text" value="<?= e(strtoupper($user['role'])) ?>" disabled class="w-full pl-8 pr-3 py-2.5 rounded-xl bg-slate-50 text-xs sm:text-sm font-bold text-slate-500 border border-slate-200/80 cursor-not-allowed">
                             </div>
                         </div>
                     </div>
@@ -364,7 +356,7 @@ require_once __DIR__ . '/includes/navbar.php';
                         </label>
                         <!-- Input file ẩn thực tế -->
                         <input type="file" id="avatarFileInput" name="avatar_file" accept=".jpg,.jpeg,.png,.webp,.gif" class="hidden" onchange="handleAvatarFileSelect(this)">
-                        
+
                         <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2.5">
                             <div class="flex items-center gap-2.5 min-w-0">
                                 <span class="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 text-xs shrink-0 shadow-2xs">
@@ -398,7 +390,7 @@ require_once __DIR__ . '/includes/navbar.php';
         <div class="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm flex flex-col justify-between">
             <form method="POST" action="" id="passwordForm" class="flex flex-col justify-between h-full space-y-4">
                 <input type="hidden" name="action_password" value="1">
-                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
 
                 <!-- Phần trên: Tiêu đề + 3 Phần mật khẩu tương ứng hoàn hảo -->
                 <div class="space-y-3.5">
@@ -411,7 +403,7 @@ require_once __DIR__ . '/includes/navbar.php';
                         </h2>
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                             <i class="fa-solid fa-shield-halved text-[9px]"></i>
-                            BCRYPT
+                            Argon2id
                         </span>
                     </div>
 
@@ -437,7 +429,7 @@ require_once __DIR__ . '/includes/navbar.php';
                             </label>
                             <div class="relative">
                                 <i class="fa-solid fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                                <input type="password" id="inputNewPassword" name="new_password" required minlength="6" oninput="checkPassStrength(this.value)" placeholder="Tối thiểu 6 ký tự..." class="w-full pl-8 pr-9 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-mono focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all">
+                                <input type="password" id="inputNewPassword" name="new_password" required minlength="12" maxlength="1024" oninput="checkPassStrength(this.value)" placeholder="Tối thiểu 12 ký tự..." class="w-full pl-8 pr-9 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-mono focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all">
                                 <button type="button" onclick="togglePassVisibility('inputNewPassword', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
                                     <i class="fa-regular fa-eye text-xs"></i>
                                 </button>
@@ -450,7 +442,7 @@ require_once __DIR__ . '/includes/navbar.php';
                             </label>
                             <div class="relative">
                                 <i class="fa-solid fa-lock-open absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                                <input type="password" id="inputConfirmPassword" name="confirm_password" required minlength="6" placeholder="Nhập lại mật khẩu..." class="w-full pl-8 pr-9 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-mono focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all">
+                                <input type="password" id="inputConfirmPassword" name="confirm_password" required minlength="12" maxlength="1024" placeholder="Nhập lại mật khẩu..." class="w-full pl-8 pr-9 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm font-mono focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all">
                                 <button type="button" onclick="togglePassVisibility('inputConfirmPassword', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
                                     <i class="fa-regular fa-eye text-xs"></i>
                                 </button>
@@ -502,7 +494,7 @@ function triggerAvatarUpload() {
 function handleAvatarFileSelect(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
-        
+
         // Kiểm tra kích thước < 5MB
         if (file.size > 5 * 1024 * 1024) {
             Swal.fire('Lỗi', 'Kích thước file ảnh không được vượt quá 5MB!', 'error');

@@ -1,5 +1,7 @@
 <?php
+declare(strict_types=1);
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/passwords.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -21,9 +23,15 @@ $action = trim($_POST['action'] ?? '');
 if ($action === 'login') {
     $account = trim($_POST['account'] ?? '');
     $password = $_POST['password'] ?? '';
-    $redirect = trim($_POST['redirect'] ?? (BASE_URL . '/'));
+    $redirect = safe_redirect_path($_POST['redirect'] ?? '/');
+    $loginIp = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    if (!security_rate_limit('login-ip:' . $loginIp, 30, 900)
+        || !security_rate_limit('login-account:' . strtolower($account), 10, 900)) {
+        http_response_code(429);
+        json_response(false, 'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau 15 phút.');
+    }
 
-    if (empty($account) || empty($password)) {
+    if (empty($account) || !is_string($password) || $password === '' || strlen($password) > 1024) {
         json_response(false, 'Vui lòng nhập đầy đủ tên đăng nhập/email và mật khẩu!');
     }
 
@@ -33,26 +41,28 @@ if ($action === 'login') {
     }
 
     try {
-        $stmt = $db->prepare("SELECT * FROM users WHERE username = ? OR email = ? LIMIT 1");
+        $db->beginTransaction();
+        $stmt = $db->prepare("SELECT * FROM users WHERE (username = ? OR email = ?) AND deleted_at IS NULL LIMIT 1 FOR UPDATE");
         $stmt->execute([$account, $account]);
         $user = $stmt->fetch();
 
-        if (!$user) {
-            json_response(false, 'Tài khoản không tồn tại trên hệ thống!');
+        if (!$user || !app_password_verify($password, (string)$user['password']) || $user['status'] === 'banned') {
+            $db->rollBack();
+            json_response(false, 'Thông tin đăng nhập không chính xác!');
         }
-
-        if ($user['status'] === 'banned') {
-            json_response(false, 'Tài khoản của bạn đã bị khóa do vi phạm chính sách! Vui lòng liên hệ Admin.');
+        if (app_password_needs_rehash($user['password'])) {
+            $upgradedHash = app_password_hash($password, true);
+            $upgrade = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
+            $upgrade->execute([$upgradedHash, $user['id']]);
+            $user['password'] = $upgradedHash;
         }
-
-        if (!password_verify($password, $user['password'])) {
-            json_response(false, 'Mật khẩu đăng nhập không chính xác!');
-        }
+        $db->commit();
 
         // Đăng nhập thành công, tái tạo Session ID để chống Session Fixation
         session_regenerate_id(true);
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['user_role'] = $user['role'];
+        $_SESSION['auth_password_tag'] = hash('sha256', $user['password']);
         $_SESSION['just_logged_in'] = true;
         $_SESSION['flash_message'] = [
             'type'  => 'success',
@@ -62,8 +72,9 @@ if ($action === 'login') {
         json_response(true, 'Đăng nhập thành công! Đang chuyển hướng...', [
             'redirect' => $redirect
         ]);
-    } catch (Exception $e) {
-        json_response(false, 'Lỗi hệ thống: ' . $e->getMessage());
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) { $db->rollBack(); }
+        json_response(false, 'Lỗi hệ thống: ' . public_error($e));
     }
 }
 
@@ -73,7 +84,11 @@ if ($action === 'register') {
     $email = strtolower(trim($_POST['email'] ?? ''));
     $password = $_POST['password'] ?? '';
     $passwordConfirm = $_POST['password_confirm'] ?? '';
-    $redirect = trim($_POST['redirect'] ?? (BASE_URL . '/'));
+    $redirect = safe_redirect_path($_POST['redirect'] ?? '/');
+    if (!security_rate_limit('register-ip:' . ($_SERVER['REMOTE_ADDR'] ?? ''), 5, 3600)) {
+        http_response_code(429);
+        json_response(false, 'Bạn đã tạo quá nhiều yêu cầu đăng ký. Vui lòng thử lại sau.');
+    }
 
     if (empty($fullname) || empty($username) || empty($email) || empty($password)) {
         json_response(false, 'Vui lòng điền đầy đủ tất cả các trường thông tin!');
@@ -92,11 +107,11 @@ if ($action === 'register') {
         json_response(false, 'Địa chỉ email không đúng định dạng!');
     }
 
-    if (strlen($password) < 6) {
-        json_response(false, 'Mật khẩu phải chứa ít nhất 6 ký tự!');
+    if (strlen($password) < 12 || strlen($password) > 1024) {
+        json_response(false, 'Mật khẩu phải có từ 12 đến 1024 ký tự!');
     }
 
-    if ($password !== $passwordConfirm) {
+    if (!hash_equals($password, $passwordConfirm)) {
         json_response(false, 'Mật khẩu xác nhận không trùng khớp!');
     }
 
@@ -108,24 +123,25 @@ if ($action === 'register') {
 
         if ($existing) {
             if ($existing['username'] === $username) {
-                json_response(false, 'Tên đăng nhập này đã được sử dụng!');
+                json_response(false, 'Không thể tạo tài khoản với thông tin này.');
             }
             if ($existing['email'] === $email) {
-                json_response(false, 'Địa chỉ email này đã được đăng ký!');
+                json_response(false, 'Không thể tạo tài khoản với thông tin này.');
             }
         }
 
-        // Mã hóa mật khẩu an toàn với BCRYPT
-        $hashPassword = password_hash($password, PASSWORD_BCRYPT, ['cost' => 10]);
+        // HMAC-SHA256 with environment pepper, then Argon2id
+        $hashPassword = app_password_hash($password);
 
-        $insertStmt = $db->prepare("INSERT INTO users (username, email, password, fullname, role, status) VALUES (?, ?, ?, ?, 'user', 'active')");
-        $insertStmt->execute([$username, $email, $hashPassword, $fullname]);
+        $insertStmt = $db->prepare("INSERT INTO users (public_id, username, email, password, fullname, role, status) VALUES (?, ?, ?, ?, ?, 'user', 'active')");
+        $insertStmt->execute([uuid_v4(), $username, $email, $hashPassword, $fullname]);
         $newUserId = (int)$db->lastInsertId();
 
         // Tự động đăng nhập
         session_regenerate_id(true);
         $_SESSION['user_id'] = $newUserId;
         $_SESSION['user_role'] = 'user';
+        $_SESSION['auth_password_tag'] = hash('sha256', $hashPassword);
         $_SESSION['just_logged_in'] = true;
         $_SESSION['flash_message'] = [
             'type'  => 'success',
@@ -135,8 +151,9 @@ if ($action === 'register') {
         json_response(true, 'Đăng ký tài khoản thành công! Đang chuyển hướng...', [
             'redirect' => $redirect
         ]);
-    } catch (Exception $e) {
-        json_response(false, 'Lỗi hệ thống: ' . $e->getMessage());
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) { $db->rollBack(); }
+        json_response(false, 'Lỗi hệ thống: ' . public_error($e));
     }
 }
 

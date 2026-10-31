@@ -7,7 +7,11 @@
     RewriteBase /
 
     # 1. Chặn truy cập trực tiếp vào các thư mục hệ thống nhạy cảm
-    RewriteRule ^(config|includes|brain|\.git)/ - [F,L,NC]
+    RewriteRule ^(config|includes|brain|database|docs|tests|storage|delivery|\.git|\.codex|\.agents)(/|$) - [F,L,NC]
+    RewriteRule (^|/)\. - [F,L]
+    RewriteRule ^assets/.*\.(php[0-9]?|phtml|phar)(/|$) - [F,L,NC]
+    RewriteRule \.(sql|log|bak|old|ini|env|zip|tar|gz)$ - [F,L,NC]
+    RewriteRule ^router\.php$ - [F,L,NC]
 
     # 2. Redirect 301 vĩnh viễn nếu người dùng gõ trực tiếp /index.php -> /
     RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /index\.php [NC]
@@ -47,7 +51,7 @@
 </IfModule>
 
 # Bảo vệ các file cấu hình quan trọng
-<FilesMatch "^(config\.php|database\.php|\.env|\.htaccess)$">
+<FilesMatch "(?i)(\.(sql|log|bak|old|ini|env|zip|tar|gz)$|^(config\.php|database\.php|\.env|\.htaccess)$)">
     Order allow,deny
     Deny from all
 </FilesMatch>

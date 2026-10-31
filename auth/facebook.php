@@ -1,5 +1,7 @@
 <?php
+declare(strict_types=1);
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/passwords.php';
 
 $appId       = get_setting('oauth_facebook_app_id', '');
 $appSecret   = get_setting('oauth_facebook_app_secret', '');
@@ -8,7 +10,7 @@ $redirectUri = get_setting('oauth_facebook_redirect_uri', BASE_URL . '/auth/face
 if (empty($appId) || empty($appSecret)) {
     die('<!DOCTYPE html>
     <html lang="vi">
-    <head><meta charset="UTF-8"><title>Chưa cấu hình Facebook OAuth</title><script src="https://cdn.tailwindcss.com"></script></head>
+    <head><meta charset="UTF-8"><title>Chưa cấu hình Facebook OAuth</title></head>
     <body class="bg-slate-50 text-slate-800 min-h-screen flex items-center justify-center p-4">
         <div class="max-w-md w-full bg-white rounded-2xl p-6 border border-slate-200 shadow-xl text-center">
             <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center mx-auto mb-4 text-2xl font-bold">f</div>
@@ -22,8 +24,7 @@ if (empty($appId) || empty($appSecret)) {
 
 // BƯỚC 1: Chuyển hướng sang Facebook Login Dialog
 if (!isset($_GET['code'])) {
-    $state = bin2hex(random_bytes(16));
-    $_SESSION['oauth_state'] = $state;
+    $state = oauth_create_state('facebook');
 
     $params = [
         'client_id'     => $appId,
@@ -37,6 +38,7 @@ if (!isset($_GET['code'])) {
 }
 
 // BƯỚC 2: Đổi code lấy Access Token
+if (!oauth_consume_state('facebook', $_GET['state'] ?? null)) { http_response_code(403); exit('Phiên đăng nhập không hợp lệ hoặc đã hết hạn.'); }
 $code = $_GET['code'];
 $tokenUrl = 'https://graph.facebook.com/v19.0/oauth/access_token?' . http_build_query([
     'client_id'     => $appId,
@@ -48,14 +50,15 @@ $tokenUrl = 'https://graph.facebook.com/v19.0/oauth/access_token?' . http_build_
 $ch = curl_init($tokenUrl);
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_SSL_VERIFYPEER => false
+    CURLOPT_SSL_VERIFYHOST => 2,
+    CURLOPT_SSL_VERIFYPEER => true
 ]);
 $tokenResponse = curl_exec($ch);
 curl_close($ch);
 
 $tokenData = json_decode($tokenResponse, true);
 if (empty($tokenData['access_token'])) {
-    die('Không thể lấy Token từ Facebook: ' . htmlspecialchars($tokenResponse));
+    error_log('OAuth token exchange failed'); http_response_code(502); exit('Không thể kết nối dịch vụ đăng nhập.');
 }
 
 // BƯỚC 3: Lấy thông tin người dùng từ Facebook Graph API
@@ -63,7 +66,8 @@ $infoUrl = 'https://graph.facebook.com/me?fields=id,name,email,picture.type(larg
 $ch = curl_init($infoUrl);
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_SSL_VERIFYPEER => false
+    CURLOPT_SSL_VERIFYHOST => 2,
+    CURLOPT_SSL_VERIFYPEER => true
 ]);
 $userResponse = curl_exec($ch);
 curl_close($ch);
@@ -81,11 +85,12 @@ $picture = $fbUser['picture']['data']['url'] ?? 'assets/images/default-avatar.pn
 // BƯỚC 4: Tìm hoặc tạo tài khoản trong CSDL
 if ($db) {
     try {
-        $stmt = $db->prepare("SELECT * FROM users WHERE (oauth_provider = 'facebook' AND oauth_uid = ?) OR email = ? LIMIT 1");
-        $stmt->execute([$fbId, $email]);
+        $stmt = $db->prepare("SELECT * FROM users WHERE oauth_provider = 'facebook' AND oauth_uid = ? LIMIT 1");
+        $stmt->execute([$fbId]);
         $user = $stmt->fetch();
 
         if ($user) {
+            if (($user['status'] !== 'active' || $user['deleted_at'] !== null)) { http_response_code(403); exit('Tài khoản đã bị khóa.'); }
             $upStmt = $db->prepare("UPDATE users SET oauth_provider = 'facebook', oauth_uid = ? WHERE id = ?");
             $upStmt->execute([$fbId, $user['id']]);
             $userId = $user['id'];
@@ -101,19 +106,20 @@ if ($db) {
                 $counter++;
             }
 
-            $dummyPass = password_hash(bin2hex(random_bytes(16)), PASSWORD_BCRYPT);
-            $inStmt = $db->prepare("INSERT INTO users (username, email, password, fullname, avatar, oauth_provider, oauth_uid, role, status) VALUES (?, ?, ?, ?, ?, 'facebook', ?, 'user', 'active')");
-            $inStmt->execute([$username, $email, $dummyPass, $name, $picture, $fbId]);
+            $dummyPass = app_password_hash(bin2hex(random_bytes(32)));
+            $inStmt = $db->prepare("INSERT INTO users (public_id, username, email, password, fullname, avatar, oauth_provider, oauth_uid, role, status) VALUES (?, ?, ?, ?, ?, ?, 'facebook', ?, 'user', 'active')");
+            $inStmt->execute([uuid_v4(), $username, $email, $dummyPass, $name, $picture, $fbId]);
             $userId = (int)$db->lastInsertId();
         }
 
         session_regenerate_id(true);
         $_SESSION['user_id'] = $userId;
         $_SESSION['user_role'] = $user['role'] ?? 'user';
+        $_SESSION['auth_password_tag'] = hash('sha256', $user['password'] ?? $dummyPass);
 
         header('Location: ' . BASE_URL . '/');
         exit;
-    } catch (Exception $e) {
-        die('Lỗi xử lý Facebook OAuth: ' . $e->getMessage());
+    } catch (Throwable $e) {
+        die('Lỗi xử lý Facebook OAuth: ' . public_error($e));
     }
 }

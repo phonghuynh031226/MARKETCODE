@@ -1,9 +1,10 @@
 <?php
+declare(strict_types=1);
 require_once __DIR__ . '/config/config.php';
 require_login();
 
 $user = current_user();
-$orderId = (int)($_GET['order_id'] ?? 0);
+$orderId = $db ? public_id_to_internal($db, 'orders', $_GET['order_id'] ?? null) : 0;
 $token = trim($_GET['token'] ?? '');
 
 if (!$db) {
@@ -13,28 +14,29 @@ if (!$db) {
 $order = null;
 try {
     if ($orderId > 0) {
-        $stmt = $db->prepare("SELECT o.*, p.title as product_title, p.download_url, p.file_size 
-                              FROM orders o 
-                              JOIN products p ON o.product_id = p.id 
-                              WHERE o.id = ? AND o.user_id = ? AND o.status = 'completed' LIMIT 1");
+        $stmt = $db->prepare("SELECT o.*, p.title as product_title, p.download_url, p.file_size
+                              FROM orders o
+                              JOIN products p ON o.product_id = p.id
+                              WHERE o.id = ? AND o.user_id = ? AND o.status = 'completed' AND o.deleted_at IS NULL LIMIT 1");
         $stmt->execute([$orderId, $user['id']]);
         $order = $stmt->fetch();
     } elseif (!empty($token)) {
-        $stmt = $db->prepare("SELECT o.*, p.title as product_title, p.download_url, p.file_size 
-                              FROM orders o 
-                              JOIN products p ON o.product_id = p.id 
-                              WHERE o.download_token = ? AND o.user_id = ? AND o.status = 'completed' LIMIT 1");
+        $stmt = $db->prepare("SELECT o.*, p.title as product_title, p.download_url, p.file_size
+                              FROM orders o
+                              JOIN products p ON o.product_id = p.id
+                              WHERE o.download_token = ? AND o.user_id = ? AND o.status = 'completed' AND o.deleted_at IS NULL LIMIT 1");
         $stmt->execute([$token, $user['id']]);
         $order = $stmt->fetch();
     }
 } catch (Exception $e) {
-    die('Lỗi tra cứu đơn hàng: ' . $e->getMessage());
+    die('Lỗi tra cứu đơn hàng: ' . public_error($e));
 }
 
 if (!$order) {
+    http_response_code(404);
     die('<!DOCTYPE html>
     <html lang="vi">
-    <head><meta charset="UTF-8"><title>Không tìm thấy file</title><script src="https://cdn.tailwindcss.com"></script></head>
+    <head><meta charset="UTF-8"><title>Không tìm thấy file</title></head>
     <body class="bg-slate-50 text-slate-800 min-h-screen flex items-center justify-center p-4">
         <div class="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center space-y-4">
             <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 border border-rose-200 flex items-center justify-center mx-auto text-2xl font-bold">✕</div>
@@ -46,20 +48,28 @@ if (!$order) {
     </html>');
 }
 
-$downloadUrl = $order['download_url'];
+if ($token !== '' && !hash_equals((string)$order['download_token'], $token)) { http_response_code(404); exit('Không tìm thấy quyền tải.'); }
+$downloadUrl = (string)$order['download_url'];
 
-// Nếu là file cục bộ tồn tại trên máy chủ
-if (file_exists($downloadUrl) && !is_dir($downloadUrl)) {
-    header('Content-Description: File Transfer');
+// Local paid files may only be read from private storage/downloads.
+if (!preg_match('#^https?://#i', $downloadUrl)) {
+    if (!preg_match('/\A[a-zA-Z0-9._-]{1,160}\.(zip|7z|rar|pdf)\z/iD', basename($downloadUrl))) {
+        http_response_code(404); exit('Tệp tải xuống không hợp lệ.');
+    }
+    $privateRoot = realpath(ROOT_PATH . '/storage/downloads');
+    $filePath = $privateRoot !== false ? realpath($privateRoot . DIRECTORY_SEPARATOR . basename($downloadUrl)) : false;
+    if ($privateRoot === false || $filePath === false || !str_starts_with($filePath, $privateRoot . DIRECTORY_SEPARATOR)
+        || !is_file($filePath) || !in_array(strtolower(pathinfo($filePath, PATHINFO_EXTENSION)), ['zip', '7z', 'rar', 'pdf'], true)) {
+        http_response_code(404); exit('Tệp tải xuống không hợp lệ.');
+    }
     header('Content-Type: application/octet-stream');
-    header('Content-Disposition: attachment; filename="' . basename($downloadUrl) . '"');
-    header('Expires: 0');
-    header('Cache-Control: must-revalidate');
-    header('Pragma: public');
-    header('Content-Length: ' . filesize($downloadUrl));
-    readfile($downloadUrl);
-    exit;
+    header('Content-Disposition: attachment; filename="' . basename($filePath) . '"');
+    header('Cache-Control: private, no-store');
+    header('Content-Length: ' . (string)filesize($filePath));
+    readfile($filePath); exit;
 }
+$downloadUrl = safe_url($downloadUrl, false);
+if ($downloadUrl === '') { http_response_code(404); exit('Liên kết tải không hợp lệ.'); }
 
 // Nếu là liên kết ngoài (Google Drive / Mega / Dropbox) -> Hiển thị trang trung chuyển an toàn có đếm ngược
 $pageTitle = "Tải Mã Nguồn: " . $order['product_title'];
@@ -88,11 +98,11 @@ require_once __DIR__ . '/includes/navbar.php';
         </div>
 
         <div class="space-y-3">
-            <a id="btnDirectDownload" href="<?= xss_clean($downloadUrl) ?>" target="_blank" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all">
+            <a id="btnDirectDownload" href="<?= e($downloadUrl) ?>" target="_blank" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all">
                 <i class="fa-solid fa-download"></i>
                 <span>Tải Xuống Trực Tiếp</span>
             </a>
-            <a href="<?= BASE_URL ?>/history?tab=orders" class="block text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors">
+            <a href="<?= e(BASE_URL) ?>/history?tab=orders" class="block text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors">
                 Quay lại danh sách đã mua
             </a>
         </div>
@@ -102,7 +112,7 @@ require_once __DIR__ . '/includes/navbar.php';
 <script>
     let timeLeft = 3;
     const countEl = document.getElementById('countdownNumber');
-    const targetUrl = <?= json_encode($downloadUrl) ?>;
+    const targetUrl = <?= js($downloadUrl) ?>;
 
     const timer = setInterval(() => {
         timeLeft--;

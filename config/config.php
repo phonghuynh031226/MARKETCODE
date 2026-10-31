@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * ========================================================
  * Cấu hình Hệ thống, Khởi tạo Session & Helper Functions
@@ -6,9 +7,52 @@
  */
 
 // Bật hiển thị lỗi trong môi trường phát triển (tắt khi lên Production)
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+ini_set('log_errors', '1');
 error_reporting(E_ALL);
+require_once __DIR__ . '/../includes/security.php';
+require_once __DIR__ . '/../includes/identities.php';
+require_once __DIR__ . '/../includes/uploads.php';
+require_once __DIR__ . '/../includes/money.php';
+require_once __DIR__ . '/../includes/output.php';
+set_exception_handler(function (Throwable $error) {
+    error_log('Unhandled application error: ' . $error->getMessage());
+    http_response_code($error instanceof InvalidArgumentException ? 400 : 500);
+    if (preg_match('#/(api|ajax)/#', $_SERVER['SCRIPT_NAME'] ?? '')) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'message' => 'Hệ thống gặp lỗi. Vui lòng thử lại sau.'], JSON_UNESCAPED_UNICODE);
+    } else { echo 'Hệ thống gặp lỗi. Vui lòng thử lại sau.'; }
+});
+
+foreach ([$_GET, $_POST] as $inputSet) {
+    foreach ($inputSet as $inputName => $inputValue) {
+        if (is_array($inputValue) && $inputName === 'existing_gallery' && count($inputValue) <= 5) {
+            foreach ($inputValue as $image) {
+                if (!is_string($image) || strlen($image) > 2048) { throw new InvalidArgumentException('Invalid gallery'); }
+            }
+            continue;
+        }
+        $maxLength = match ($inputName) {
+            'password', 'password_confirm', 'old_password', 'new_password', 'confirm_password' => 1024,
+            'email' => 254, 'account', 'fullname', 'title', 'download_url', 'demo_url' => 255,
+            'username' => 30, 'name' => 100, 'slug' => 280, 'short_desc', 'description' => 500,
+            'serial', 'pin', 'code' => 50, 'csrf_token' => 64, 'otp' => 6,
+            'redirect', 'avatar' => 2048, 'q', 'reason' => 1000,
+            default => 100000,
+        };
+        if (!is_string($inputValue) || strlen($inputValue) > $maxLength) { throw new InvalidArgumentException('Invalid request parameter'); }
+    }
+}
+
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || (int)($_SERVER['SERVER_PORT'] ?? 0) === 443
+    || strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
+ini_set('session.use_strict_mode', '1');
+ini_set('session.use_only_cookies', '1');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
 
 // Cấu hình Timezone Việt Nam
 date_default_timezone_set('Asia/Ho_Chi_Minh');
@@ -19,11 +63,18 @@ if (session_status() === PHP_SESSION_NONE) {
         'lifetime' => 86400 * 7, // 7 ngày
         'path'     => '/',
         'domain'   => '',
-        'secure'   => isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on',
+        'secure'   => $isHttps,
         'httponly' => true,
         'samesite' => 'Lax'
     ]);
     session_start();
+}
+
+$callbackScripts = ['/api/webhook_bank.php', '/api/callback_card.php', '/api/momo_ipn.php'];
+$scriptPath = parse_url($_SERVER['SCRIPT_NAME'] ?? '', PHP_URL_PATH) ?: '';
+if (in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['POST', 'PUT', 'PATCH', 'DELETE'], true)
+    && !in_array($scriptPath, $callbackScripts, true)) {
+    security_require_post_csrf();
 }
 
 // Định nghĩa đường dẫn
@@ -38,6 +89,9 @@ $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
     || (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower($_SERVER['HTTP_X_FORWARDED_SSL']) === 'on');
 $protocol = $isHttps ? "https://" : "http://";
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+if (!is_string($host) || !preg_match('/\A(?:[a-zA-Z0-9.-]+|\[[a-fA-F0-9:]+\])(?::[0-9]{1,5})?\z/D', $host)) {
+    throw new InvalidArgumentException('Invalid host');
+}
 $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME']));
 $scriptDir = rtrim($scriptDir, '/');
 // Nếu file nằm trong folder con (như /ajax, /api, /auth, /user hay /admin) thì chuẩn hóa về thư mục gốc của project
@@ -49,33 +103,8 @@ require_once CONFIG_PATH . '/database.php';
 
 try {
     $db = Database::getInstance();
-    // Tự động khởi tạo bảng password_resets nếu chưa có
-    $db->exec("CREATE TABLE IF NOT EXISTS `password_resets` (
-        `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        `email` VARCHAR(255) NOT NULL,
-        `token` VARCHAR(10) NOT NULL,
-        `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-
-    // Tự động khởi tạo bảng momo_transactions nếu chưa có
-    $db->exec("CREATE TABLE IF NOT EXISTS `momo_transactions` (
-        `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-        `order_id` VARCHAR(64) NOT NULL,
-        `request_id` VARCHAR(64) NOT NULL,
-        `user_id` INT UNSIGNED NOT NULL,
-        `amount` BIGINT UNSIGNED NOT NULL,
-        `status` ENUM('pending', 'success', 'failed') NOT NULL DEFAULT 'pending',
-        `momo_trans_id` VARCHAR(64) DEFAULT NULL,
-        `result_code` INT DEFAULT NULL,
-        `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY (`id`),
-        UNIQUE KEY `uk_momo_order_id` (`order_id`),
-        UNIQUE KEY `uk_momo_request_id` (`request_id`),
-        KEY `idx_momo_user_created` (`user_id`, `created_at`),
-        KEY `idx_momo_status` (`status`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-} catch (Exception $e) {
+} catch (Throwable $error) {
+    error_log('Database initialization failed: ' . $error->getMessage());
     $db = null;
 }
 
@@ -94,11 +123,31 @@ if ($db) {
     }
 }
 
+// Request audit never stores submitted values, passwords, tokens, PINs or signatures.
+if ($db instanceof PDO && in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+    register_shutdown_function(static function (): void {
+        global $db;
+        if (!$db instanceof PDO || $db->inTransaction()) { return; }
+        try { audit_event($db, 'request.http_' . (string)http_response_code(), basename($_SERVER['SCRIPT_NAME'] ?? 'unknown')); }
+        catch (Throwable $error) { error_log('Audit persistence failed'); }
+    });
+}
+
 /**
  * Lấy giá trị cài đặt hệ thống
  */
 function get_setting(string $key, string $default = ''): string {
     global $SYSTEM_SETTINGS;
+    $secretName = match ($key) {
+        'momo_partner_code' => 'MOMO_PARTNER_CODE', 'momo_access_key' => 'MOMO_ACCESS_KEY', 'momo_secret_key' => 'MOMO_SECRET_KEY',
+        'card_partner_id' => 'CARD_PARTNER_ID', 'card_partner_key' => 'CARD_PARTNER_KEY',
+        'oauth_google_client_id' => 'GOOGLE_CLIENT_ID', 'oauth_google_client_secret' => 'GOOGLE_CLIENT_SECRET',
+        'oauth_facebook_app_id' => 'FACEBOOK_APP_ID', 'oauth_facebook_app_secret' => 'FACEBOOK_APP_SECRET',
+        'oauth_zalo_app_id' => 'ZALO_APP_ID', 'oauth_zalo_secret_key' => 'ZALO_SECRET_KEY',
+        'recaptcha_secret_key' => 'CAPTCHA_SECRET_KEY', 'cron_security_key' => 'CRON_SECURITY_KEY',
+        default => null,
+    };
+    if ($secretName !== null) { return security_config($secretName, $default); }
     return $SYSTEM_SETTINGS[$key] ?? $default;
 }
 
@@ -109,13 +158,14 @@ function update_setting(string $key, string $value, string $desc = ''): bool {
     global $db, $SYSTEM_SETTINGS;
     if (!$db) return false;
     try {
-        $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value, description) 
-                              VALUES (?, ?, ?) 
+        $stmt = $db->prepare("INSERT INTO settings (setting_key, setting_value, description)
+                              VALUES (?, ?, ?)
                               ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()");
         $stmt->execute([$key, $value, $desc]);
         $SYSTEM_SETTINGS[$key] = $value;
         return true;
     } catch (Exception $e) {
+        error_log('Setting update failed: ' . $e->getMessage());
         return false;
     }
 }
@@ -133,8 +183,8 @@ function csrf_token(): string {
 /**
  * Xác thực CSRF Token
  */
-function verify_csrf_token(?string $token): bool {
-    if (empty($_SESSION['csrf_token']) || empty($token)) {
+function verify_csrf_token(mixed $token): bool {
+    if (!is_string($token) || strlen($token) !== 64 || empty($_SESSION['csrf_token'])) {
         return false;
     }
     return hash_equals($_SESSION['csrf_token'], $token);
@@ -172,7 +222,7 @@ function verify_captcha(?string $captchaResponse): bool {
     $context  = stream_context_create($options);
     $result = @file_get_contents($url, false, $context);
     if ($result === false) {
-        return true; // Fallback an toàn nếu máy chủ không kết nối được Google
+        return false;
     }
     $response = json_decode($result, true);
     return !empty($response['success']);
@@ -183,7 +233,7 @@ function verify_captcha(?string $captchaResponse): bool {
  */
 function xss_clean(?string $data): string {
     if ($data === null) return '';
-    return htmlspecialchars(trim($data), ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars(trim($data), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
 /**
@@ -191,14 +241,14 @@ function xss_clean(?string $data): string {
  */
 function format_money(float|int|string|null $amount): string {
     $amount = (float)($amount ?? 0);
-    return number_format($amount, 0, ',', '.') . ' ₫';
+    return number_format((float)($amount), 0, ',', '.') . ' ₫';
 }
 
 /**
  * Kiểm tra trạng thái đăng nhập
  */
 function is_logged(): bool {
-    return !empty($_SESSION['user_id']);
+    return !empty($_SESSION['user_id']) && current_user() !== null;
 }
 
 /**
@@ -206,19 +256,25 @@ function is_logged(): bool {
  */
 function current_user(): ?array {
     global $db;
-    if (!is_logged() || !$db) {
+    if (empty($_SESSION['user_id']) || !$db) {
         return null;
     }
-    
+
     static $cachedUser = null;
     if ($cachedUser !== null) {
         return $cachedUser;
     }
 
     try {
-        $stmt = $db->prepare("SELECT id, username, email, fullname, avatar, balance, total_deposited, role, status FROM users WHERE id = ? LIMIT 1");
+        $stmt = $db->prepare("SELECT id, public_id, username, email, fullname, avatar, balance, total_deposited, role, status, password FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1");
         $stmt->execute([$_SESSION['user_id']]);
         $cachedUser = $stmt->fetch() ?: null;
+        if ($cachedUser && ($cachedUser['status'] !== 'active'
+            || !hash_equals(hash('sha256', $cachedUser['password']), (string)($_SESSION['auth_password_tag'] ?? '')))) {
+            unset($_SESSION['user_id'], $_SESSION['user_role']);
+            $cachedUser = null;
+        }
+        if ($cachedUser) { unset($cachedUser['password']); }
         return $cachedUser;
     } catch (Exception $e) {
         return null;
@@ -303,13 +359,8 @@ function slugify(string $text): string {
  * Lấy địa chỉ IP thực của người dùng (hỗ trợ Proxy, Cloudflare, Load Balancer)
  */
 function getClientIP(): string {
-    $ipKeys = [
-        'HTTP_CF_CONNECTING_IP',
-        'HTTP_X_REAL_IP',
-        'HTTP_X_FORWARDED_FOR',
-        'HTTP_CLIENT_IP',
-        'REMOTE_ADDR'
-    ];
+    // Forwarded client headers must not let callers bypass rate limits.
+    $ipKeys = ['REMOTE_ADDR'];
 
     foreach ($ipKeys as $key) {
         if (!empty($_SERVER[$key])) {

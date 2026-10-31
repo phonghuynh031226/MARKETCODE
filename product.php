@@ -1,64 +1,34 @@
 <?php
+declare(strict_types=1);
 require_once __DIR__ . '/config/config.php';
 
-$id = (int)($_GET['id'] ?? 0);
+$id = $db ? public_id_to_internal($db, 'products', $_GET['id'] ?? null) : 0;
 $slug = trim($_GET['slug'] ?? '');
 
 $product = null;
 if ($db) {
     try {
         if ($id > 0) {
-            $stmt = $db->prepare("SELECT p.*, c.name as category_name, c.slug as category_slug 
-                                  FROM products p 
-                                  JOIN categories c ON p.category_id = c.id 
-                                  WHERE p.id = ? AND p.status = 'active' LIMIT 1");
+            $stmt = $db->prepare("SELECT p.*, c.name as category_name, c.slug as category_slug
+                                  FROM products p
+                                  JOIN categories c ON p.category_id = c.id
+                                  WHERE p.id = ? AND p.status = 'active' AND p.deleted_at IS NULL AND c.deleted_at IS NULL LIMIT 1");
             $stmt->execute([$id]);
             $product = $stmt->fetch();
         } elseif (!empty($slug)) {
-            $stmt = $db->prepare("SELECT p.*, c.name as category_name, c.slug as category_slug 
-                                  FROM products p 
-                                  JOIN categories c ON p.category_id = c.id 
-                                  WHERE p.slug = ? AND p.status = 'active' LIMIT 1");
+            $stmt = $db->prepare("SELECT p.*, c.name as category_name, c.slug as category_slug
+                                  FROM products p
+                                  JOIN categories c ON p.category_id = c.id
+                                  WHERE p.slug = ? AND p.status = 'active' AND p.deleted_at IS NULL AND c.deleted_at IS NULL LIMIT 1");
             $stmt->execute([$slug]);
             $product = $stmt->fetch();
         }
 
-        if ($product) {
-            $clientIP = getClientIP();
 
-            $pvStmt = $db->prepare("INSERT IGNORE INTO product_views (product_id, ip_address) VALUES (?, ?)");
-            $pvStmt->execute([$product['id'], $clientIP]);
-
-            if ($pvStmt->rowCount() > 0) {
-                $db->prepare("UPDATE products SET views = views + 1 WHERE id = ?")->execute([$product['id']]);
-                $product['views'] = ((int)($product['views'] ?? 0)) + 1;
-            }
-        }
     } catch (Exception $e) {}
 }
 
-// Fallback demo data nếu chưa nạp database
-if (!$product) {
-    $product = [
-        'id'             => 1,
-        'category_id'    => 1,
-        'title'          => 'Hệ Thống Website Bán Mã Nguồn Tự Động PHP Thuần PDO',
-        'slug'           => 'he-thong-web-ban-ma-nguon-tu-dong-php',
-        'category_name'  => 'PHP & Laravel',
-        'category_slug'  => 'php-laravel',
-        'short_desc'     => 'Hệ thống sàn mua bán source code tự động tích hợp nạp thẻ cào, VietQR tự động, quản trị toàn diện, mã hóa CSRF & PDO.',
-        'content'        => '<p class="mb-4">Bộ mã nguồn được xây dựng bằng <strong>PHP 8.x</strong> thuần hướng đối tượng, bảo mật kết nối PDO, giao diện Tailwind CSS hiện đại chuẩn UI/UX.</p><h3 class="text-lg font-bold my-3 text-indigo-600">Tính năng cốt lõi:</h3><ul class="list-disc pl-5 space-y-2 mb-4"><li>Tự động hóa nạp thẻ cào qua Thesieure/Doithe1s chuẩn chữ ký MD5.</li><li>Tự động hóa nạp tiền qua VietQR MBBank/Vietcombank đối soát biến động số dư.</li><li>Bảo vệ chống tấn công SQL Injection bằng Prepared Statements, mã hóa mật khẩu BCRYPT, xác thực CSRF Token.</li><li>Bảng điều khiển Admin với Chart.js thống kê doanh thu, quản trị thành viên, sản phẩm và giao dịch.</li></ul>',
-        'price'          => 499000,
-        'sale_price'     => 350000,
-        'thumbnail'      => 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&auto=format&fit=crop&q=80',
-        'demo_url'       => 'https://demo.marketcode.vn',
-        'download_url'   => 'https://drive.google.com/sample',
-        'file_size'      => '25.8 MB',
-        'download_count' => 128,
-        'views'          => 1420,
-        'created_at'     => date('Y-m-d H:i:s')
-    ];
-}
+if (!$product) { http_response_code(404); exit('Không tìm thấy sản phẩm.'); }
 
 $pageTitle = $product['title'];
 $user = current_user();
@@ -68,7 +38,7 @@ $alreadyBought = false;
 $boughtOrder = null;
 if (is_logged() && $db) {
     try {
-        $chkOrder = $db->prepare("SELECT id, order_code, download_token FROM orders WHERE user_id = ? AND product_id = ? AND status = 'completed' LIMIT 1");
+        $chkOrder = $db->prepare("SELECT id, public_id, order_code, download_token FROM orders WHERE user_id = ? AND product_id = ? AND status = 'completed' LIMIT 1");
         $chkOrder->execute([$user['id'], $product['id']]);
         $boughtOrder = $chkOrder->fetch();
         if ($boughtOrder) {
@@ -85,10 +55,10 @@ $discountPercent = $hasDiscount ? round((($product['price'] - $product['sale_pri
 $relatedProducts = [];
 if ($db && !empty($product['category_id'])) {
     try {
-        $rStmt = $db->prepare("SELECT p.*, c.name as category_name, c.slug as category_slug 
-                               FROM products p 
-                               JOIN categories c ON p.category_id = c.id 
-                               WHERE p.category_id = ? AND p.id != ? AND p.status = 'active' 
+        $rStmt = $db->prepare("SELECT p.*, c.name as category_name, c.slug as category_slug
+                               FROM products p
+                               JOIN categories c ON p.category_id = c.id
+                               WHERE p.category_id = ? AND p.id != ? AND p.status = 'active' AND p.deleted_at IS NULL AND c.deleted_at IS NULL
                                ORDER BY p.id DESC LIMIT 4");
         $rStmt->execute([$product['category_id'], $product['id']]);
         $relatedProducts = $rStmt->fetchAll();
@@ -98,12 +68,14 @@ if ($db && !empty($product['category_id'])) {
             $needed = 4 - count($relatedProducts);
             $excludeIds = array_merge([$product['id']], array_column($relatedProducts, 'id'));
             $placeholders = implode(',', array_fill(0, count($excludeIds), '?'));
-            $fallbackStmt = $db->prepare("SELECT p.*, c.name as category_name, c.slug as category_slug 
-                                          FROM products p 
-                                          JOIN categories c ON p.category_id = c.id 
-                                          WHERE p.id NOT IN ($placeholders) AND p.status = 'active' 
-                                          ORDER BY p.id DESC LIMIT $needed");
-            $fallbackStmt->execute($excludeIds);
+            $fallbackStmt = $db->prepare("SELECT p.*, c.name as category_name, c.slug as category_slug
+                                          FROM products p
+                                          JOIN categories c ON p.category_id = c.id
+                                          WHERE p.id NOT IN ($placeholders) AND p.status = 'active' AND p.deleted_at IS NULL AND c.deleted_at IS NULL
+                                          ORDER BY p.id DESC LIMIT ?");
+            foreach ($excludeIds as $position => $excludeId) { $fallbackStmt->bindValue($position + 1, (int)$excludeId, PDO::PARAM_INT); }
+            $fallbackStmt->bindValue(count($excludeIds) + 1, $needed, PDO::PARAM_INT);
+            $fallbackStmt->execute();
             $fallbackProducts = $fallbackStmt->fetchAll();
             $relatedProducts = array_merge($relatedProducts, $fallbackProducts);
         }
@@ -220,11 +192,11 @@ require_once __DIR__ . '/includes/navbar.php';
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
     <!-- Breadcrumb -->
     <nav class="flex items-center gap-2 text-xs text-slate-500 overflow-x-auto whitespace-nowrap">
-        <a href="<?= BASE_URL ?>/" class="hover:text-indigo-600 transition-colors">Trang Chủ</a>
+        <a href="<?= e(BASE_URL) ?>/" class="hover:text-indigo-600 transition-colors">Trang Chủ</a>
         <i class="fa-solid fa-chevron-right text-[10px] text-slate-400"></i>
-        <a href="<?= BASE_URL ?>/categories" class="hover:text-indigo-600 transition-colors">Kho Mã Nguồn</a>
+        <a href="<?= e(BASE_URL) ?>/categories" class="hover:text-indigo-600 transition-colors">Kho Mã Nguồn</a>
         <i class="fa-solid fa-chevron-right text-[10px] text-slate-400"></i>
-        <a href="<?= BASE_URL ?>/categories?slug=<?= urlencode($product['category_slug'] ?? '') ?>" class="hover:text-indigo-600 font-medium text-indigo-600 transition-colors">
+        <a href="<?= e(BASE_URL) ?>/categories?slug=<?= e(urlencode($product['category_slug'] ?? '')) ?>" class="hover:text-indigo-600 font-medium text-indigo-600 transition-colors">
             <?= xss_clean($product['category_name']) ?>
         </a>
         <i class="fa-solid fa-chevron-right text-[10px] text-slate-400"></i>
@@ -237,11 +209,11 @@ require_once __DIR__ . '/includes/navbar.php';
         <div class="lg:col-span-7 flex flex-col justify-between gap-3.5">
             <!-- Phần trên: Ảnh Chính Lớn (flex-1 min-h-[320px]) -->
             <div class="flex-1 min-h-[320px] relative rounded-3xl overflow-hidden border border-slate-200/80 bg-slate-900 shadow-sm group cursor-pointer" onclick="openLightbox(currentGalleryIndex)" title="Click để phóng to ảnh toàn màn hình">
-                <img id="mainProductImage" src="<?= xss_clean($galleryImages[0] ?? $product['thumbnail']) ?>" alt="<?= xss_clean($product['title']) ?>" class="w-full h-full object-cover transition-all duration-300">
-                
+                <img id="mainProductImage" src="<?= e(safe_url($galleryImages[0] ?? $product['thumbnail'])) ?>" alt="<?= xss_clean($product['title']) ?>" class="w-full h-full object-cover transition-all duration-300">
+
                 <?php if ($hasDiscount): ?>
                     <span class="absolute top-5 right-5 px-3 py-1 rounded-xl bg-rose-500 text-white font-extrabold text-xs shadow-md z-10 pointer-events-none">
-                        -<?= $discountPercent ?>%
+                        -<?= e($discountPercent) ?>%
                     </span>
                 <?php endif; ?>
 
@@ -254,8 +226,8 @@ require_once __DIR__ . '/includes/navbar.php';
             <!-- Phần dưới: Hàng Ảnh Phụ (shrink-0 grid grid-cols-4 sm:grid-cols-5 gap-3) -->
             <div class="shrink-0 grid grid-cols-4 sm:grid-cols-5 gap-2.5 sm:gap-3" id="galleryThumbnailsContainer">
                 <?php foreach ($galleryImages as $idx => $img): ?>
-                    <button type="button" onclick="changeMainImage('<?= xss_clean($img) ?>', this, <?= $idx ?>)" onmouseenter="changeMainImage('<?= xss_clean($img) ?>', this, <?= $idx ?>)" class="gallery-thumb-item <?= $idx === 0 ? 'border-indigo-600 ring-2 ring-indigo-500/20 opacity-100' : 'border-slate-200 opacity-70 hover:opacity-100 hover:border-indigo-300' ?> h-16 sm:h-20 rounded-2xl overflow-hidden border-2 cursor-pointer transition-all bg-slate-900 relative p-0">
-                        <img src="<?= xss_clean($img) ?>" alt="Gallery <?= $idx + 1 ?>" class="w-full h-full object-cover pointer-events-none" onerror="this.onerror=null;this.src='<?= BASE_URL ?>/assets/images/default-code.jpg';">
+                    <button type="button" onclick="changeMainImage(<?= e(js(safe_url($img))) ?>, this, <?= e($idx) ?>)" onmouseenter="changeMainImage(<?= e(js(safe_url($img))) ?>, this, <?= e($idx) ?>)" class="gallery-thumb-item <?= e($idx === 0 ? 'border-indigo-600 ring-2 ring-indigo-500/20 opacity-100' : 'border-slate-200 opacity-70 hover:opacity-100 hover:border-indigo-300') ?> h-16 sm:h-20 rounded-2xl overflow-hidden border-2 cursor-pointer transition-all bg-slate-900 relative p-0">
+                        <img src="<?= e(safe_url($img)) ?>" alt="Gallery <?= e($idx + 1) ?>" class="w-full h-full object-cover pointer-events-none" onerror="this.onerror=null;this.src='<?= e(BASE_URL) ?>/assets/images/default-code.jpg';">
                     </button>
                 <?php endforeach; ?>
             </div>
@@ -280,15 +252,15 @@ require_once __DIR__ . '/includes/navbar.php';
                 <div class="flex flex-wrap items-center gap-2 sm:gap-2.5 text-xs text-slate-500 font-medium mt-3">
                     <span class="flex items-center gap-1.5 text-indigo-700 font-bold bg-indigo-50 border border-indigo-200/60 px-2.5 py-1 rounded-lg">
                         <i class="fa-regular fa-eye text-indigo-600"></i>
-                        <span><span class="counter-val" data-target="<?= (int)($product['views'] ?? $product['view_count'] ?? 0) ?>"><?= number_format((int)($product['views'] ?? $product['view_count'] ?? 0)) ?></span> lượt xem</span>
+                        <span><span class="counter-val" data-target="<?= e((int)($product['views'] ?? $product['view_count'] ?? 0)) ?>"><?= e(number_format((float)((int)($product['views'] ?? $product['view_count'] ?? 0)))) ?></span> lượt xem</span>
                     </span>
                     <span class="flex items-center gap-1.5 text-emerald-700 font-bold bg-emerald-50 border border-emerald-200/60 px-2.5 py-1 rounded-lg">
                         <i class="fa-solid fa-download text-emerald-600"></i>
-                        <span><span class="counter-val" data-target="<?= (int)$product['download_count'] ?>"><?= number_format((int)$product['download_count']) ?></span> lượt tải</span>
+                        <span><span class="counter-val" data-target="<?= e((int)$product['download_count']) ?>"><?= e(number_format((float)((int)$product['download_count']))) ?></span> lượt tải</span>
                     </span>
                     <span class="flex items-center gap-1.5 text-slate-500 bg-slate-50 border border-slate-200/70 px-2.5 py-1 rounded-lg">
                         <i class="fa-regular fa-calendar-check text-slate-400"></i>
-                        <span>Cập nhật: <?= date('d/m/Y', strtotime($product['updated_at'] ?? $product['created_at'])) ?></span>
+                        <span>Cập nhật: <?= e(date('d/m/Y', strtotime($product['updated_at'] ?? $product['created_at']))) ?></span>
                     </span>
                 </div>
 
@@ -307,14 +279,14 @@ require_once __DIR__ . '/includes/navbar.php';
                     <span class="text-xs font-semibold text-slate-500">Giá sở hữu trọn bộ mã nguồn:</span>
                     <div class="flex items-baseline gap-2.5 mt-1 flex-wrap">
                         <span class="text-3xl font-extrabold text-indigo-600 tracking-tight">
-                            <?= $currentPrice <= 0 ? 'Miễn phí' : number_format($currentPrice, 0, ',', '.') . 'đ' ?>
+                            <?= e($currentPrice <= 0 ? 'Miễn phí' : number_format((float)($currentPrice), 0, ',', '.') . 'đ') ?>
                         </span>
                         <?php if ($hasDiscount && $product['price'] > 0): ?>
                             <span class="text-sm text-slate-400 line-through">
-                                <?= number_format($product['price'], 0, ',', '.') ?>đ
+                                <?= e(number_format((float)($product['price']), 0, ',', '.')) ?>đ
                             </span>
                             <span class="px-2 py-0.5 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 text-xs font-black">
-                                -<?= $discountPercent ?>%
+                                -<?= e($discountPercent) ?>%
                             </span>
                         <?php endif; ?>
                     </div>
@@ -326,36 +298,36 @@ require_once __DIR__ . '/includes/navbar.php';
                     <?php if (is_logged()): ?>
                         <?php $userBal = (float)($user['balance'] ?? 0); ?>
                         <div class="flex items-center gap-2">
-                            <strong class="text-emerald-600 font-bold"><?= number_format($userBal, 0, ',', '.') ?>đ</strong>
+                            <strong class="text-emerald-600 font-bold"><?= e(number_format((float)($userBal), 0, ',', '.')) ?>đ</strong>
                             <?php if ($userBal < $currentPrice): ?>
-                                <a href="<?= BASE_URL ?>/deposit?tab=bank" class="px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white font-bold text-[11px] transition-colors border border-indigo-200/60" title="Nạp thêm tiền vào tài khoản">
+                                <a href="<?= e(BASE_URL) ?>/deposit?tab=bank" class="px-2 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white font-bold text-[11px] transition-colors border border-indigo-200/60" title="Nạp thêm tiền vào tài khoản">
                                     + Nạp thêm
                                 </a>
                             <?php endif; ?>
                         </div>
                     <?php else: ?>
-                        <a href="<?= BASE_URL ?>/login?redirect=<?= urlencode($_SERVER['REQUEST_URI'] ?? '/product?id=' . $product['id']) ?>" class="text-indigo-600 hover:text-indigo-700 font-bold hover:underline">
+                        <a href="<?= e(BASE_URL) ?>/login?redirect=<?= e(urlencode($_SERVER['REQUEST_URI'] ?? '/product?id=' . public_reference('products', (int)$product['id']))) ?>" class="text-indigo-600 hover:text-indigo-700 font-bold hover:underline">
                             Đăng nhập ngay
                         </a>
                     <?php endif; ?>
                 </div>
 
                 <!-- 2 Nút Hành Động (Mua Ngay + Live Demo ngang hàng) -->
-                <div class="<?= !empty($product['demo_url']) ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : 'space-y-2' ?>">
+                <div class="<?= e(!empty($product['demo_url']) ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : 'space-y-2') ?>">
                     <?php if ($alreadyBought): ?>
-                        <a href="<?= BASE_URL ?>/download?order_id=<?= $boughtOrder['id'] ?>" class="btn-shimmer w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all active:scale-95 text-center">
+                        <a href="<?= e(BASE_URL) ?>/download?order_id=<?= e(public_reference('orders', (int)$boughtOrder['id'])) ?>" class="btn-shimmer w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all active:scale-95 text-center">
                             <i class="fa-solid fa-cloud-arrow-down text-base"></i>
                             <span>Tải Mã Nguồn</span>
                         </a>
                     <?php else: ?>
-                        <button type="button" onclick="confirmBuyProduct(<?= (int)$product['id'] ?>)" class="btn-shimmer w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-extrabold text-sm shadow-md shadow-indigo-500/25 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-95 cursor-pointer">
+                        <button type="button" onclick="confirmBuyProduct(<?= e(js(public_reference('products', (int)$product['id']))) ?>)" class="btn-shimmer w-full py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-extrabold text-sm shadow-md shadow-indigo-500/25 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-95 cursor-pointer">
                             <i class="fa-solid fa-cart-shopping text-base"></i>
                             <span>Mua Ngay</span>
                         </button>
                     <?php endif; ?>
 
                     <?php if (!empty($product['demo_url'])): ?>
-                        <a href="<?= xss_clean($product['demo_url']) ?>" target="_blank" class="w-full py-3.5 rounded-2xl border-2 border-indigo-200 hover:border-indigo-500 text-indigo-600 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-95 bg-white text-center">
+                        <a href="<?= e(safe_url($product['demo_url'])) ?>" target="_blank" class="w-full py-3.5 rounded-2xl border-2 border-indigo-200 hover:border-indigo-500 text-indigo-600 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all active:scale-95 bg-white text-center">
                             <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
                             <span>Xem Live Demo</span>
                         </a>
@@ -430,7 +402,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
         <!-- Rich text content -->
         <div class="prose max-w-none text-slate-700 leading-relaxed text-sm sm:text-base space-y-4">
-            <?= $product['content'] ?>
+            <?= e($product['content']) ?>
         </div>
     </div>
 
@@ -444,25 +416,25 @@ require_once __DIR__ . '/includes/navbar.php';
                     </h2>
                     <p class="text-xs text-slate-500 mt-1">Các sản phẩm liên quan trong chuyên mục <?= xss_clean($product['category_name']) ?></p>
                 </div>
-                <a href="<?= BASE_URL ?>/categories?slug=<?= urlencode($product['category_slug'] ?? '') ?>" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 transition-colors">
+                <a href="<?= e(BASE_URL) ?>/categories?slug=<?= e(urlencode($product['category_slug'] ?? '')) ?>" class="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 transition-colors">
                     <span>Xem tất cả</span>
                     <i class="fa-solid fa-arrow-right text-[10px]"></i>
                 </a>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="responsive-card-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <?php foreach ($relatedProducts as $idx => $rel): ?>
-                    <?php 
+                    <?php
                         $relPrice = (!empty($rel['sale_price']) && $rel['sale_price'] > 0) ? (float)$rel['sale_price'] : (float)$rel['price'];
                         $relHasDiscount = (!empty($rel['sale_price']) && $rel['sale_price'] < $rel['price']);
                         $relDiscountPct = $relHasDiscount ? round((($rel['price'] - $rel['sale_price']) / $rel['price']) * 100) : 0;
                     ?>
                     <!-- Product Card chuẩn Gumroad đồng bộ với Categories -->
-                    <div class="product-card group bg-white rounded-2xl border border-slate-200/80 overflow-hidden flex flex-col" style="--ci: <?= ($idx % 4) + 1 ?>;">
+                    <div class="product-card group bg-white rounded-2xl border border-slate-200/80 overflow-hidden flex flex-col" style="--ci: <?= e(($idx % 4) + 1) ?>;">
                         <!-- Phần Ảnh (aspect-[16/10]) -->
-                        <a href="<?= BASE_URL ?>/product?id=<?= $rel['id'] ?>" class="product-thumb-container aspect-[16/10] bg-slate-100 block">
-                            <img src="<?= xss_clean($rel['thumbnail']) ?>" alt="<?= xss_clean($rel['title']) ?>" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='<?= BASE_URL ?>/assets/images/default-code.jpg';">
-                            
+                        <a href="<?= e(BASE_URL) ?>/product?id=<?= e(public_reference('products', (int)$rel['id'])) ?>" class="product-thumb-container aspect-[16/10] bg-slate-100 block">
+                            <img src="<?= e(safe_url($rel['thumbnail'])) ?>" alt="<?= xss_clean($rel['title']) ?>" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='<?= e(BASE_URL) ?>/assets/images/default-code.jpg';">
+
                             <!-- Góc trên bên trái ảnh: Badge tên danh mục gọn gàng -->
                             <span class="absolute top-2.5 left-2.5 bg-slate-900/75 backdrop-blur-md text-white text-[11px] font-medium px-2.5 py-1 rounded-lg z-20 truncate max-w-[140px]">
                                 <?= xss_clean($rel['category_name'] ?? 'Mã Nguồn') ?>
@@ -471,7 +443,7 @@ require_once __DIR__ . '/includes/navbar.php';
                             <!-- Góc trên bên phải ảnh: Badge giảm giá nếu có -->
                             <?php if ($relHasDiscount): ?>
                                 <span class="absolute top-2.5 right-2.5 bg-rose-500 text-white text-[11px] font-bold px-2 py-1 rounded-lg z-20 shadow-sm">
-                                    -<?= $relDiscountPct ?>%
+                                    -<?= e($relDiscountPct) ?>%
                                 </span>
                             <?php endif; ?>
                         </a>
@@ -481,7 +453,7 @@ require_once __DIR__ . '/includes/navbar.php';
                             <div>
                                 <!-- Tiêu đề (gọn gàng line-clamp-1) -->
                                 <h3 class="text-[15px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
-                                    <a href="<?= BASE_URL ?>/product?id=<?= $rel['id'] ?>" title="<?= xss_clean($rel['title']) ?>">
+                                    <a href="<?= e(BASE_URL) ?>/product?id=<?= e(public_reference('products', (int)$rel['id'])) ?>" title="<?= xss_clean($rel['title']) ?>">
                                         <?= xss_clean($rel['title']) ?>
                                     </a>
                                 </h3>
@@ -497,11 +469,11 @@ require_once __DIR__ . '/includes/navbar.php';
                                 <div class="flex items-center gap-4 mt-3 text-xs text-slate-500 font-medium">
                                     <span class="inline-flex items-center gap-1.5" title="Lượt xem">
                                         <i class="fa-regular fa-eye text-slate-400"></i>
-                                        <span class="counter-val" data-target="<?= (int)($rel['views'] ?? $rel['view_count'] ?? 0) ?>"><?= number_format((int)($rel['views'] ?? $rel['view_count'] ?? 0)) ?></span> lượt xem
+                                        <span class="counter-val" data-target="<?= e((int)($rel['views'] ?? $rel['view_count'] ?? 0)) ?>"><?= e(number_format((float)((int)($rel['views'] ?? $rel['view_count'] ?? 0)))) ?></span> lượt xem
                                     </span>
                                     <span class="inline-flex items-center gap-1.5" title="Lượt tải">
                                         <i class="fa-solid fa-download text-slate-400"></i>
-                                        <span class="counter-val" data-target="<?= (int)$rel['download_count'] ?>"><?= number_format((int)$rel['download_count']) ?></span> lượt tải
+                                        <span class="counter-val" data-target="<?= e((int)$rel['download_count']) ?>"><?= e(number_format((float)((int)$rel['download_count']))) ?></span> lượt tải
                                     </span>
                                 </div>
                             </div>
@@ -512,18 +484,18 @@ require_once __DIR__ . '/includes/navbar.php';
                                 <div class="flex flex-col justify-center min-w-0 leading-none">
                                     <?php if ($relHasDiscount && $rel['price'] > 0): ?>
                                         <span class="text-[11px] font-medium text-slate-400 line-through mb-1 whitespace-nowrap">
-                                            <?= number_format($rel['price'], 0, ',', '.') ?>đ
+                                            <?= e(number_format((float)($rel['price']), 0, ',', '.')) ?>đ
                                         </span>
                                     <?php else: ?>
                                         <span class="text-[11px] text-transparent mb-1 select-none leading-none whitespace-nowrap" aria-hidden="true">&nbsp;</span>
                                     <?php endif; ?>
                                     <span class="text-[17px] font-extrabold text-indigo-600 tracking-tight whitespace-nowrap">
-                                        <?= $relPrice <= 0 ? 'Miễn phí' : number_format($relPrice, 0, ',', '.') . 'đ' ?>
+                                        <?= e($relPrice <= 0 ? 'Miễn phí' : number_format((float)($relPrice), 0, ',', '.') . 'đ') ?>
                                     </span>
                                 </div>
 
                                 <!-- Bên phải: Nút bấm gọn gàng không rớt dòng -->
-                                <a href="<?= BASE_URL ?>/product?id=<?= $rel['id'] ?>" class="product-detail-btn shrink-0 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all duration-300 inline-flex items-center gap-1.5 whitespace-nowrap">
+                                <a href="<?= e(BASE_URL) ?>/product?id=<?= e(public_reference('products', (int)$rel['id'])) ?>" class="product-detail-btn shrink-0 bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white text-xs font-bold px-3.5 py-2.5 rounded-xl transition-all duration-300 inline-flex items-center gap-1.5 whitespace-nowrap">
                                     <span>Chi tiết</span>
                                     <i class="product-detail-arrow fa-solid fa-arrow-right text-[10px]"></i>
                                 </a>
@@ -538,11 +510,11 @@ require_once __DIR__ . '/includes/navbar.php';
 
 <!-- Modal Fullscreen Image Lightbox -->
 <div id="imageLightboxModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/90 backdrop-blur-md transition-all duration-300 select-none" onclick="closeLightbox()">
-    <div class="relative max-w-6xl max-h-[92vh] w-full flex flex-col items-center justify-center" onclick="event.stopPropagation()">
+    <div class="relative max-w-6xl max-h-[92dvh] w-full flex flex-col items-center justify-center" onclick="event.stopPropagation()">
         <!-- Thanh công cụ góc trên: bộ đếm và nút đóng -->
         <div class="w-full flex items-center justify-between text-white text-xs font-semibold px-2 mb-3">
             <span id="lightboxCounter" class="bg-slate-800/80 px-3.5 py-1.5 rounded-xl border border-slate-700 tracking-wider">
-                1 / <?= count($galleryImages) ?>
+                1 / <?= e(count($galleryImages)) ?>
             </span>
             <button type="button" onclick="closeLightbox()" class="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white flex items-center justify-center transition-all cursor-pointer border border-slate-700" title="Đóng Lightbox (Phím Esc)">
                 <i class="fa-solid fa-xmark text-sm"></i>
@@ -551,7 +523,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
         <!-- Khung ảnh chính trong Lightbox -->
         <div class="relative w-full flex items-center justify-center">
-            <img id="lightboxMainImg" src="<?= xss_clean($galleryImages[0] ?? $product['thumbnail']) ?>" alt="Zoomed preview" class="max-w-full max-h-[78vh] object-contain rounded-2xl shadow-2xl transition-all duration-200">
+            <img id="lightboxMainImg" src="<?= e(safe_url($galleryImages[0] ?? $product['thumbnail'])) ?>" alt="Zoomed preview" class="max-w-full max-h-[78dvh] object-contain rounded-2xl shadow-2xl transition-all duration-200">
 
             <!-- Nút Prev -->
             <button type="button" onclick="prevLightboxImage()" class="absolute left-1 sm:-left-5 w-11 h-11 rounded-full bg-slate-900/80 hover:bg-indigo-600 text-white flex items-center justify-center transition-all shadow-lg border border-slate-700 cursor-pointer" title="Ảnh trước (Phím mũi tên trái)">
@@ -567,7 +539,7 @@ require_once __DIR__ . '/includes/navbar.php';
 </div>
 
 <script>
-    const galleryList = <?= json_encode($galleryImages, JSON_UNESCAPED_SLASHES) ?>;
+    const galleryList = <?= js(array_map('safe_url', $galleryImages)) ?>;
     let currentGalleryIndex = 0;
 
     // Đổi ảnh chính lớn khi click/hover ảnh phụ
@@ -711,7 +683,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
         const result = await Swal.fire({
             title: 'Xác Nhận Mua Mã Nguồn',
-            html: `Bạn có chắc muốn thanh toán <b><?= number_format($currentPrice, 0, ',', '.') ?>đ</b> để sở hữu mã nguồn này?<br><small class="text-slate-500">Số dư hiện tại: <?= number_format($user['balance'] ?? 0, 0, ',', '.') ?>đ</small>`,
+            html: `Bạn có chắc muốn thanh toán <b><?= number_format((float)($currentPrice), 0, ',', '.') ?>đ</b> để sở hữu mã nguồn này?<br><small class="text-slate-500">Số dư hiện tại: <?= number_format((float)($user['balance'] ?? 0), 0, ',', '.') ?>đ</small>`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Xác nhận mua ngay',
@@ -726,7 +698,7 @@ require_once __DIR__ . '/includes/navbar.php';
         try {
             const formData = new FormData();
             formData.append('product_id', productId);
-            formData.append('csrf_token', '<?= csrf_token() ?>');
+            formData.append('csrf_token', '<?= e(csrf_token()) ?>');
 
             const res = await fetch('<?= BASE_URL ?>/api/buy_code.php', {
                 method: 'POST',
@@ -761,7 +733,7 @@ require_once __DIR__ . '/includes/navbar.php';
                         }
                     });
                 } else {
-                    Swal.fire('Lỗi Thanh Toán', data.message || 'Giao dịch không thành công!', 'error');
+                    Swal.fire({titleText: 'Lỗi Thanh Toán', text: data.message || 'Giao dịch không thành công!', icon: 'error'});
                 }
             }
         } catch (err) {

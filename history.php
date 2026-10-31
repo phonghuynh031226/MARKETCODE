@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 $pageTitle = "Lịch Sử Giao Dịch & Đơn Hàng";
 require_once __DIR__ . '/config/config.php';
 require_login();
@@ -19,10 +20,10 @@ $cardTx = [];
 if ($db) {
     try {
         // 1. Danh sách đơn hàng mua code
-        $oStmt = $db->prepare("SELECT o.*, p.title as product_title, p.slug as product_slug, p.thumbnail, p.file_size 
-                              FROM orders o 
-                              JOIN products p ON o.product_id = p.id 
-                              WHERE o.user_id = ? 
+        $oStmt = $db->prepare("SELECT o.*, p.title as product_title, p.slug as product_slug, p.thumbnail, p.file_size
+                              FROM orders o
+                              JOIN products p ON o.product_id = p.id
+                              WHERE o.user_id = ?
                               ORDER BY o.id DESC");
         $oStmt->execute([$user['id']]);
         $orders = $oStmt->fetchAll();
@@ -73,11 +74,11 @@ require_once __DIR__ . '/includes/navbar.php';
         </div>
 
         <div class="flex items-center gap-2.5 shrink-0">
-            <a href="<?= BASE_URL ?>/deposit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-indigo-500/20 flex items-center gap-1.5 transition-all cursor-pointer">
+            <a href="<?= e(BASE_URL) ?>/deposit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-indigo-500/20 flex items-center gap-1.5 transition-all cursor-pointer">
                 <i class="fa-solid fa-wallet text-xs"></i>
                 <span>Nạp Tiền Ngay</span>
             </a>
-            <a href="<?= BASE_URL ?>/categories" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer">
+            <a href="<?= e(BASE_URL) ?>/categories" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer">
                 <i class="fa-solid fa-layer-group text-indigo-500 text-xs"></i>
                 <span>Xem Mã Nguồn</span>
             </a>
@@ -95,12 +96,12 @@ require_once __DIR__ . '/includes/navbar.php';
                 <div class="min-w-0">
                     <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">Mã nguồn đã mua</span>
                     <div class="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
-                        <?= number_format($totalSpentOrders, 0, ',', '.') ?> đ
+                        <?= e(number_format((float)($totalSpentOrders), 0, ',', '.')) ?> đ
                     </div>
                 </div>
             </div>
             <span class="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-full shrink-0">
-                <?= $totalOrdersCount ?> bộ code
+                <?= e($totalOrdersCount) ?> bộ code
             </span>
         </div>
 
@@ -113,12 +114,12 @@ require_once __DIR__ . '/includes/navbar.php';
                 <div class="min-w-0">
                     <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">Tổng nạp Ví MoMo</span>
                     <div class="text-lg sm:text-xl font-extrabold text-emerald-600 tracking-tight">
-                        +<?= number_format($totalBankAmount, 0, ',', '.') ?> đ
+                        +<?= e(number_format((float)($totalBankAmount), 0, ',', '.')) ?> đ
                     </div>
                 </div>
             </div>
             <span class="text-[11px] font-bold text-[#A50064] bg-pink-50 border border-pink-200 px-2.5 py-1 rounded-full shrink-0">
-                <?= count($successBankTx) ?> GD Thành công
+                <?= e(count($successBankTx)) ?> GD Thành công
             </span>
         </div>
 
@@ -131,40 +132,40 @@ require_once __DIR__ . '/includes/navbar.php';
                 <div class="min-w-0">
                     <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">Tổng nạp Thẻ cào</span>
                     <div class="text-lg sm:text-xl font-extrabold text-emerald-600 tracking-tight">
-                        +<?= number_format($totalCardAmount, 0, ',', '.') ?> đ
+                        +<?= e(number_format((float)($totalCardAmount), 0, ',', '.')) ?> đ
                     </div>
                 </div>
             </div>
             <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full shrink-0">
-                <?= count($successCardTx) ?> Thẻ đúng
+                <?= e(count($successCardTx)) ?> Thẻ đúng
             </span>
         </div>
     </div>
 
     <!-- 3. GỘP THANH TAB & BẢNG DỮ LIỆU VÀO CHUNG 1 CARD HIỆN ĐẠI -->
     <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        
+
         <!-- Header của Card: 3 nút Tab Segmented Pill & Ô Tìm Kiếm Nhanh -->
         <div class="p-3 sm:p-4 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <!-- 3 nút Tab Segmented Pill -->
             <div class="bg-slate-200/70 p-1 rounded-xl inline-flex gap-1 overflow-x-auto shrink-0">
-                <a href="<?= BASE_URL ?>/history?tab=orders" 
-                   class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer <?= $activeTab === 'orders' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900' ?>">
+                <a href="<?= e(BASE_URL) ?>/history?tab=orders"
+                   class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer <?= e($activeTab === 'orders' ? 'bg-white text-indigo-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900') ?>">
                     <span>📦</span>
                     <span>Mã nguồn đã mua</span>
-                    <span class="px-1.5 py-0.5 rounded-md text-[10px] <?= $activeTab === 'orders' ? 'bg-indigo-50 text-indigo-700 font-extrabold' : 'bg-slate-200 text-slate-600' ?>"><?= count($orders) ?></span>
+                    <span class="px-1.5 py-0.5 rounded-md text-[10px] <?= e($activeTab === 'orders' ? 'bg-indigo-50 text-indigo-700 font-extrabold' : 'bg-slate-200 text-slate-600') ?>"><?= e(count($orders)) ?></span>
                 </a>
-                <a href="<?= BASE_URL ?>/history?tab=momo" 
-                   class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer <?= $activeTab === 'momo' ? 'bg-white text-[#A50064] shadow-2xs' : 'text-slate-600 hover:text-slate-900' ?>">
+                <a href="<?= e(BASE_URL) ?>/history?tab=momo"
+                   class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer <?= e($activeTab === 'momo' ? 'bg-white text-[#A50064] shadow-2xs' : 'text-slate-600 hover:text-slate-900') ?>">
                     <span>🟣</span>
                     <span>Nạp Ví MoMo</span>
-                    <span class="px-1.5 py-0.5 rounded-md text-[10px] <?= $activeTab === 'momo' ? 'bg-pink-50 text-[#A50064] font-extrabold' : 'bg-slate-200 text-slate-600' ?>"><?= count($bankTx) ?></span>
+                    <span class="px-1.5 py-0.5 rounded-md text-[10px] <?= e($activeTab === 'momo' ? 'bg-pink-50 text-[#A50064] font-extrabold' : 'bg-slate-200 text-slate-600') ?>"><?= e(count($bankTx)) ?></span>
                 </a>
-                <a href="<?= BASE_URL ?>/history?tab=card" 
-                   class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer <?= $activeTab === 'card' ? 'bg-white text-emerald-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900' ?>">
+                <a href="<?= e(BASE_URL) ?>/history?tab=card"
+                   class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer <?= e($activeTab === 'card' ? 'bg-white text-emerald-600 shadow-2xs' : 'text-slate-600 hover:text-slate-900') ?>">
                     <span>💳</span>
                     <span>Nạp Thẻ cào</span>
-                    <span class="px-1.5 py-0.5 rounded-md text-[10px] <?= $activeTab === 'card' ? 'bg-emerald-50 text-emerald-700 font-extrabold' : 'bg-slate-200 text-slate-600' ?>"><?= count($cardTx) ?></span>
+                    <span class="px-1.5 py-0.5 rounded-md text-[10px] <?= e($activeTab === 'card' ? 'bg-emerald-50 text-emerald-700 font-extrabold' : 'bg-slate-200 text-slate-600') ?>"><?= e(count($cardTx)) ?></span>
                 </a>
             </div>
 
@@ -181,7 +182,7 @@ require_once __DIR__ . '/includes/navbar.php';
         <?php if ($activeTab === 'orders'): ?>
             <?php if (!empty($orders)): ?>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm border-collapse">
+                    <div class="responsive-table" role="region" aria-label="Bảng dữ liệu, cuộn ngang khi cần" tabindex="0"><table data-responsive="wide" class="w-full text-left text-sm border-collapse">
                         <thead>
                             <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/40">
                                 <th class="py-3 px-4">Mã Đơn</th>
@@ -199,13 +200,13 @@ require_once __DIR__ . '/includes/navbar.php';
                                     </td>
                                     <td class="py-3.5 px-4">
                                         <div class="flex items-center gap-3">
-                                            <img src="<?= xss_clean($o['thumbnail']) ?>" alt="" class="w-10 h-10 rounded-xl object-cover border border-slate-200/80 shrink-0 shadow-2xs" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=100&auto=format&fit=crop&q=80';">
+                                            <img src="<?= e(safe_url($o['thumbnail'])) ?>" alt="" class="w-10 h-10 rounded-xl object-cover border border-slate-200/80 shrink-0 shadow-2xs" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=100&auto=format&fit=crop&q=80';">
                                             <div class="min-w-0">
-                                                <a href="<?= BASE_URL ?>/product?id=<?= $o['product_id'] ?>" class="font-bold text-xs sm:text-sm text-slate-800 hover:text-indigo-600 line-clamp-1 transition-colors">
+                                                <a href="<?= e(BASE_URL) ?>/product?id=<?= e(public_reference('products', (int)$o['product_id'])) ?>" class="font-bold text-xs sm:text-sm text-slate-800 hover:text-indigo-600 line-clamp-1 transition-colors">
                                                     <?= xss_clean($o['product_title']) ?>
                                                 </a>
                                                 <div class="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
-                                                    <span>Mã số: <?= $o['product_id'] ?></span>
+                                                    <span>Mã số: <?= e(public_reference('products', (int)$o['product_id'])) ?></span>
                                                     <?php if (!empty($o['file_size'])): ?>
                                                         <span>•</span>
                                                         <span><?= xss_clean($o['file_size']) ?></span>
@@ -215,13 +216,13 @@ require_once __DIR__ . '/includes/navbar.php';
                                         </div>
                                     </td>
                                     <td class="py-3.5 px-4 font-extrabold text-xs sm:text-sm text-slate-900 whitespace-nowrap">
-                                        <?= number_format($o['price'], 0, ',', '.') ?> đ
+                                        <?= e(number_format((float)($o['price']), 0, ',', '.')) ?> đ
                                     </td>
                                     <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">
-                                        <?= date('H:i - d/m/Y', strtotime($o['created_at'])) ?>
+                                        <?= e(date('H:i - d/m/Y', strtotime($o['created_at']))) ?>
                                     </td>
                                     <td class="py-3.5 px-4 text-center whitespace-nowrap">
-                                        <a href="<?= BASE_URL ?>/download?order_id=<?= $o['id'] ?>" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-indigo-500/20 active:scale-95 transition-all">
+                                        <a href="<?= e(BASE_URL) ?>/download?order_id=<?= e(public_reference('orders', (int)$o['id'])) ?>" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-indigo-500/20 active:scale-95 transition-all">
                                             <i class="fa-solid fa-cloud-arrow-down text-xs"></i>
                                             <span>Tải xuống ngay</span>
                                         </a>
@@ -229,7 +230,7 @@ require_once __DIR__ . '/includes/navbar.php';
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
             <?php else: ?>
                 <!-- Compact Empty State -->
@@ -242,7 +243,7 @@ require_once __DIR__ . '/includes/navbar.php';
                         <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Hàng nghìn source code chất lượng cao, sạch mã độc đang chờ đón bạn khám phá.</p>
                     </div>
                     <div class="pt-1">
-                        <a href="<?= BASE_URL ?>/categories" class="inline-flex items-center gap-1.5 py-2.5 px-5 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all">
+                        <a href="<?= e(BASE_URL) ?>/categories" class="inline-flex items-center gap-1.5 py-2.5 px-5 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition-all">
                             <span>Khám phá kho mã nguồn</span>
                             <i class="fa-solid fa-arrow-right text-xs"></i>
                         </a>
@@ -255,7 +256,7 @@ require_once __DIR__ . '/includes/navbar.php';
         <?php if ($activeTab === 'momo'): ?>
             <?php if (!empty($bankTx)): ?>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm border-collapse">
+                    <div class="responsive-table" role="region" aria-label="Bảng dữ liệu, cuộn ngang khi cần" tabindex="0"><table data-responsive="wide" class="w-full text-left text-sm border-collapse">
                         <thead>
                             <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/40">
                                 <th class="py-3 px-4">Mã GD</th>
@@ -283,13 +284,13 @@ require_once __DIR__ . '/includes/navbar.php';
                                         <?= xss_clean($b['transfer_content']) ?>
                                     </td>
                                     <td class="py-3.5 px-4 font-extrabold text-xs sm:text-sm text-emerald-600 whitespace-nowrap">
-                                        +<?= number_format($b['amount'], 0, ',', '.') ?> đ
+                                        +<?= e(number_format((float)($b['amount']), 0, ',', '.')) ?> đ
                                     </td>
                                     <td class="py-3.5 px-4 font-mono text-xs text-slate-400 whitespace-nowrap">
                                         <?= xss_clean($b['ref_transaction_id'] ?: '-') ?>
                                     </td>
                                     <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">
-                                        <?= date('H:i - d/m/Y', strtotime($b['created_at'])) ?>
+                                        <?= e(date('H:i - d/m/Y', strtotime($b['created_at']))) ?>
                                     </td>
                                     <td class="py-3.5 px-4 text-center whitespace-nowrap">
                                         <?php if ($b['status'] === 'success'): ?>
@@ -309,7 +310,7 @@ require_once __DIR__ . '/includes/navbar.php';
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
             <?php else: ?>
                 <!-- Compact Empty State -->
@@ -322,7 +323,7 @@ require_once __DIR__ . '/includes/navbar.php';
                         <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Nạp tiền tự động 24/7 qua Ví MoMo với mã giao dịch tự động cộng tiền trong 15 giây.</p>
                     </div>
                     <div class="pt-1">
-                        <a href="<?= BASE_URL ?>/deposit" class="inline-flex items-center gap-1.5 py-2.5 px-5 text-xs font-bold rounded-xl bg-[#A50064] hover:bg-[#850050] text-white shadow-xs transition-all">
+                        <a href="<?= e(BASE_URL) ?>/deposit" class="inline-flex items-center gap-1.5 py-2.5 px-5 text-xs font-bold rounded-xl bg-[#A50064] hover:bg-[#850050] text-white shadow-xs transition-all">
                             <span>Nạp Tiền MoMo Ngay</span>
                             <i class="fa-solid fa-arrow-right text-xs"></i>
                         </a>
@@ -335,7 +336,7 @@ require_once __DIR__ . '/includes/navbar.php';
         <?php if ($activeTab === 'card'): ?>
             <?php if (!empty($cardTx)): ?>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm border-collapse">
+                    <div class="responsive-table" role="region" aria-label="Bảng dữ liệu, cuộn ngang khi cần" tabindex="0"><table data-responsive="wide" class="w-full text-left text-sm border-collapse">
                         <thead>
                             <tr class="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/40">
                                 <th class="py-3 px-4">Mã GD</th>
@@ -359,16 +360,16 @@ require_once __DIR__ . '/includes/navbar.php';
                                         </span>
                                     </td>
                                     <td class="py-3.5 px-4 font-semibold text-xs text-slate-600 whitespace-nowrap">
-                                        <?= number_format($c['declared_amount'], 0, ',', '.') ?> đ
+                                        <?= e(number_format((float)($c['declared_amount']), 0, ',', '.')) ?> đ
                                     </td>
                                     <td class="py-3.5 px-4 font-extrabold text-xs sm:text-sm text-emerald-600 whitespace-nowrap">
-                                        +<?= number_format($c['received_amount'], 0, ',', '.') ?> đ
+                                        +<?= e(number_format((float)($c['received_amount']), 0, ',', '.')) ?> đ
                                     </td>
                                     <td class="py-3.5 px-4 text-xs font-mono text-slate-400 whitespace-nowrap">
-                                        <?= substr($c['pin'], 0, 4) . '****' ?> / <?= substr($c['serial'], 0, 4) . '****' ?>
+                                        <?= e(substr($c['pin'], 0, 4) . '****') ?> / <?= e(substr($c['serial'], 0, 4) . '****') ?>
                                     </td>
                                     <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">
-                                        <?= date('H:i - d/m/Y', strtotime($c['created_at'])) ?>
+                                        <?= e(date('H:i - d/m/Y', strtotime($c['created_at']))) ?>
                                     </td>
                                     <td class="py-3.5 px-4 text-center whitespace-nowrap">
                                         <?php if ($c['status'] === 'success'): ?>
@@ -388,7 +389,7 @@ require_once __DIR__ . '/includes/navbar.php';
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
             <?php else: ?>
                 <!-- Compact Empty State -->
@@ -401,7 +402,7 @@ require_once __DIR__ . '/includes/navbar.php';
                         <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1">Hỗ trợ các mạng Viettel, Vina, Mobi, Zing... Xử lý gạch thẻ tự động không cần chờ đợi.</p>
                     </div>
                     <div class="pt-1">
-                        <a href="<?= BASE_URL ?>/deposit" class="inline-flex items-center gap-1.5 py-2.5 px-5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all">
+                        <a href="<?= e(BASE_URL) ?>/deposit" class="inline-flex items-center gap-1.5 py-2.5 px-5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all">
                             <span>Nạp Thẻ Cào Ngay</span>
                             <i class="fa-solid fa-arrow-right text-xs"></i>
                         </a>

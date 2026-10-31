@@ -1,0 +1,53 @@
+<?php
+declare(strict_types=1);
+require __DIR__ . '/../includes/security.php';
+$checks = 0;
+function check(bool $condition, string $name): void {
+    global $checks;
+    if (!$condition) { throw new RuntimeException('FAIL: ' . $name); }
+    $checks++;
+}
+$secret = str_repeat('s', 40);
+$body = '{"amount":100000}';
+$now = time();
+$headers = ['HTTP_X_SEPAY_TIMESTAMP' => (string)$now, 'HTTP_X_SEPAY_SIGNATURE' => 'sha256=' . hash_hmac('sha256', $now . '.' . $body, $secret)];
+check(bank_webhook_authenticated($headers, $body, $secret, ''), 'valid signed bank payload');
+check(!bank_webhook_authenticated($headers, '{}', $secret, ''), 'reject tampered bank payload');
+check(!bank_webhook_authenticated([], $body, '', ''), 'reject unconfigured webhook');
+check(!bank_webhook_authenticated(['HTTP_AUTHORIZATION' => 'Apikey ' . $secret], $body, $secret, $secret), 'no API key downgrade when HMAC configured');
+check(bank_webhook_authenticated(['HTTP_AUTHORIZATION' => 'Apikey ' . $secret], $body, '', $secret), 'valid bank API key');
+$headers['HTTP_X_SEPAY_TIMESTAMP'] = (string)($now - 601);
+$headers['HTTP_X_SEPAY_SIGNATURE'] = 'sha256=' . hash_hmac('sha256', $headers['HTTP_X_SEPAY_TIMESTAMP'] . '.' . $body, $secret);
+check(!bank_webhook_authenticated($headers, $body, $secret, ''), 'reject stale bank payload');
+check(!card_callback_authenticated('', '123', '456', '', '1'), 'reject missing card configuration');
+check(!card_callback_authenticated($secret, '123', '456', '', '1'), 'reject omitted card signature');
+check(card_callback_authenticated($secret, '123', '456', md5($secret . '123456'), '1'), 'accept valid provider signature');
+check(!card_callback_authenticated($secret, '123', '456', md5($secret . '123456'), ''), 'reject missing card request id');
+$_SESSION = [];
+$state = oauth_create_state('google');
+check(!oauth_consume_state('google', 'wrong'), 'reject wrong OAuth state');
+$state = oauth_create_state('google');
+check(oauth_consume_state('google', $state), 'accept matching OAuth state');
+check(!oauth_consume_state('google', $state), 'reject OAuth replay');
+check(safe_redirect_path('//evil.example') === '/', 'reject protocol-relative redirect');
+check(safe_redirect_path('https://evil.example') === '/', 'reject external redirect');
+check(safe_redirect_path('/history?tab=orders') === '/history?tab=orders', 'retain local redirect');
+$image = tempnam(sys_get_temp_dir(), 'image-test-');
+file_put_contents($image, '<?php echo "not an image";');
+check(!valid_image_file($image, 'png', 5000), 'reject PHP disguised as PNG');
+file_put_contents($image, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII='));
+check(valid_image_file($image, 'png', 5000), 'accept real PNG');
+check(!valid_image_file($image, 'jpg', 5000), 'reject MIME and extension mismatch');
+unlink($image);
+$bucket = 'test-' . bin2hex(random_bytes(16));
+$testRateDirectory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . $bucket;
+putenv('RATE_LIMIT_DIRECTORY=' . $testRateDirectory);
+$_ENV['RATE_LIMIT_DIRECTORY'] = $testRateDirectory;
+check(security_rate_limit($bucket, 2, 60), 'allow first attempt');
+check(security_rate_limit($bucket, 2, 60), 'allow second attempt');
+check(!security_rate_limit($bucket, 2, 60), 'deny excessive attempt');
+unlink($testRateDirectory . '/' . hash('sha256', $bucket) . '.json');
+rmdir($testRateDirectory);
+check(like_pattern('50%_!') === '%50!%!_!!%', 'LIKE wildcard literal escaping');
+check(provider_decimal(85000.5) === '85000.5', 'provider decimal normalized before arithmetic');
+echo "PASS: $checks security checks\n";

@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * ========================================================
  * Database Connection using PDO Singleton Pattern
@@ -9,11 +10,6 @@ class Database {
     private static ?PDO $instance = null;
 
     // Cấu hình Database kết nối
-    private const DB_HOST = '127.0.0.1';
-    private const DB_PORT = '3306';
-    private const DB_NAME = 'web_ban_code';
-    private const DB_USER = 'root';
-    private const DB_PASS = 'phong123';
     private const DB_CHARSET = 'utf8mb4';
 
     private function __construct() {}
@@ -27,11 +23,22 @@ class Database {
      */
     public static function getInstance(): PDO {
         if (self::$instance === null) {
+            $setting = static function (string $key, string $fallback = ''): string {
+                if (isset($_ENV[$key])) {
+                    if (!is_string($_ENV[$key])) { throw new RuntimeException('Invalid database environment'); }
+                    return $_ENV[$key];
+                }
+                $value = getenv($key);
+                return $value !== false ? $value : $fallback;
+            };
+            if ($setting('DB_NAME') === '' || $setting('DB_USER') === '') {
+                throw new RuntimeException('Database environment not configured');
+            }
             $dsn = sprintf(
                 "mysql:host=%s;port=%s;dbname=%s;charset=%s",
-                self::DB_HOST,
-                self::DB_PORT,
-                self::DB_NAME,
+                $setting('DB_HOST', '127.0.0.1'),
+                $setting('DB_PORT', '3306'),
+                $setting('DB_NAME'),
                 self::DB_CHARSET
             );
 
@@ -40,18 +47,18 @@ class Database {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Mặc định trả về mảng kết hợp
                 PDO::ATTR_EMULATE_PREPARES   => false,                  // Vô hiệu hóa emulate để chống SQL Injection triệt để
                 PDO::ATTR_PERSISTENT         => false,
+                PDO::ATTR_TIMEOUT            => 5,
+                PDO::MYSQL_ATTR_MULTI_STATEMENTS => false,
                 PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES " . self::DB_CHARSET . " COLLATE utf8mb4_unicode_ci"
             ];
 
             try {
-                self::$instance = new PDO($dsn, self::DB_USER, self::DB_PASS, $options);
+                self::$instance = new PDO($dsn, $setting('DB_USER'), $setting('DB_PASS'), $options);
+                self::$instance->exec("SET SESSION sql_mode = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
             } catch (PDOException $e) {
                 // Trong môi trường production, log lỗi bảo mật thay vì in thẳng mật khẩu / dsn
                 error_log("Database connection error: " . $e->getMessage());
-                die(json_encode([
-                    'status'  => 'error',
-                    'message' => 'Lỗi kết nối cơ sở dữ liệu! Vui lòng kiểm tra lại cấu hình config/database.php'
-                ], JSON_UNESCAPED_UNICODE));
+                throw $e;
             }
         }
 

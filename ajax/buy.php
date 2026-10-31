@@ -1,6 +1,9 @@
 <?php
+declare(strict_types=1);
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../includes/money.php';
 
+try {
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -12,11 +15,11 @@ if (!is_logged()) {
 }
 
 $csrfToken = $_POST['csrf_token'] ?? '';
-if (!verify_csrf_token($csrfToken)) {
+if (!is_string($csrfToken) || !verify_csrf_token($csrfToken)) {
     json_response(false, 'Phiên làm việc hết hạn! Vui lòng tải lại trang.');
 }
 
-$productId = (int)($_POST['product_id'] ?? 0);
+$productId = $db ? public_id_to_internal($db, 'products', $_POST['product_id'] ?? null) : 0;
 if ($productId <= 0) {
     json_response(false, 'Mã nguồn không hợp lệ!');
 }
@@ -28,51 +31,47 @@ if (!$db) {
 $user = current_user();
 
 try {
+    $db->beginTransaction();
     // 1. Kiểm tra sản phẩm
-    $pStmt = $db->prepare("SELECT * FROM products WHERE id = ? AND status = 'active' LIMIT 1");
+    $pStmt = $db->prepare("SELECT * FROM products WHERE id = ? AND status = 'active' AND deleted_at IS NULL LIMIT 1 FOR UPDATE");
     $pStmt->execute([$productId]);
     $product = $pStmt->fetch();
 
     if (!$product) {
+        $db->rollBack();
         json_response(false, 'Sản phẩm không tồn tại hoặc đã ngừng kinh doanh!');
     }
 
-    $finalPrice = (!empty($product['sale_price']) && $product['sale_price'] > 0) ? (float)$product['sale_price'] : (float)$product['price'];
-
-    // 2. Kiểm tra số dư người dùng
-    if ((float)$user['balance'] < $finalPrice) {
-        json_response(false, 'Số dư của bạn (' . format_money($user['balance']) . ') không đủ để mua mã nguồn này (' . format_money($finalPrice) . '). Vui lòng nạp thêm tiền!', [
-            'insufficient_balance' => true,
-            'current_balance'     => $user['balance'],
-            'required_price'      => $finalPrice
-        ]);
-    }
-
-    // 3. Khởi tạo Database Transaction để bảo toàn dữ liệu (Atomic Operation)
-    $db->beginTransaction();
-
-    // Trừ tiền user có kiểm tra số dư tại tầng database (chống Race Condition)
-    $deductStmt = $db->prepare("UPDATE users SET balance = balance - ? WHERE id = ? AND balance >= ?");
-    $deductStmt->execute([$finalPrice, $user['id'], $finalPrice]);
-
-    if ($deductStmt->rowCount() === 0) {
+    $baseMinor = money_minor($product['price']);
+    $saleMinor = $product['sale_price'] === null ? 0 : money_minor($product['sale_price']);
+    $priceMinor = $saleMinor > 0 ? $saleMinor : $baseMinor;
+    $finalPrice = money_decimal($priceMinor);
+    $locked = $db->prepare("SELECT id, balance FROM users WHERE id = ? AND status = 'active' AND deleted_at IS NULL FOR UPDATE");
+    $locked->execute([$user['id']]);
+    $lockedUser = $locked->fetch();
+    if (!$lockedUser) { throw new RuntimeException('Purchase user unavailable'); }
+    $beforeMinor = money_minor($lockedUser['balance']);
+    if ($beforeMinor < $priceMinor) {
         $db->rollBack();
-        json_response(false, 'Giao dịch thất bại: Số dư tài khoản không đủ hoặc đang có giao dịch song song!');
+        json_response(false, 'Số dư không đủ. Vui lòng nạp thêm tiền!', ['insufficient_balance' => true, 'current_balance' => money_decimal($beforeMinor), 'required_price' => $finalPrice]);
     }
+    $amountBefore = money_decimal($beforeMinor);
+    $amountAfter = money_decimal($beforeMinor - $priceMinor);
+    $deductStmt = $db->prepare('UPDATE users SET balance = ? WHERE id = ?');
+    $deductStmt->execute([$amountAfter, $user['id']]);
 
     // Ghi nhật ký biến động số dư (balance_logs)
-    $amountBefore = (float)$user['balance'];
-    $amountAfter = $amountBefore - $finalPrice;
     $logStmt = $db->prepare("INSERT INTO balance_logs (user_id, amount_before, amount, amount_after, type, note) VALUES (?, ?, ?, ?, 'buy_code', ?)");
-    $logStmt->execute([$user['id'], $amountBefore, -$finalPrice, $amountAfter, 'Mua mã nguồn: ' . $product['title']]);
+    $logStmt->execute([$user['id'], $amountBefore, ($priceMinor === 0 ? '0.00' : '-' . $finalPrice), $amountAfter, 'Mua mã nguồn: ' . $product['title']]);
 
     // Tạo mã đơn hàng & download token bí mật
+    $orderPublicId = uuid_v4();
     $orderCode = 'ORD-' . strtoupper(bin2hex(random_bytes(4)));
     $downloadToken = bin2hex(random_bytes(32));
 
     // Tạo đơn hàng
-    $orderStmt = $db->prepare("INSERT INTO orders (order_code, user_id, product_id, price, download_token, status) VALUES (?, ?, ?, ?, ?, 'completed')");
-    $orderStmt->execute([$orderCode, $user['id'], $product['id'], $finalPrice, $downloadToken]);
+    $orderStmt = $db->prepare("INSERT INTO orders (public_id, order_code, user_id, product_id, price, download_token, status) VALUES (?, ?, ?, ?, ?, ?, 'completed')");
+    $orderStmt->execute([$orderPublicId, $orderCode, $user['id'], $product['id'], $finalPrice, $downloadToken]);
 
     // Cập nhật lượt tải sản phẩm
     $upStmt = $db->prepare("UPDATE products SET download_count = download_count + 1 WHERE id = ?");
@@ -86,9 +85,19 @@ try {
         'download_token' => $downloadToken
     ]);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     if ($db->inTransaction()) {
         $db->rollBack();
     }
-    json_response(false, 'Lỗi hệ thống khi thanh toán: ' . $e->getMessage());
+    json_response(false, 'Lỗi hệ thống khi thanh toán: ' . public_error($e));
+}
+
+} catch (Throwable $unexpected) {
+    error_log('Payment handler failed: ' . $unexpected->getMessage());
+    try {
+        $connection = $pdo ?? $db ?? null;
+        if ($connection instanceof PDO && $connection->inTransaction()) { $connection->rollBack(); }
+    } catch (Throwable $rollbackError) { error_log('Payment rollback failed: ' . $rollbackError->getMessage()); }
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Internal server error']);
 }

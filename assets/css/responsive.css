@@ -1,0 +1,152 @@
+/* Shared responsive foundation. No PHP or business behavior is changed here. */
+:root {
+    --page-max: 112rem;
+    --page-gutter: clamp(.875rem, 2.5vw, 2rem);
+    --layout-gap: clamp(.75rem, 1.8vw, 1.5rem);
+    --touch-size: 2.75rem;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { inline-size: 100%; -webkit-text-size-adjust: 100%; }
+body { margin: 0; min-inline-size: 0; inline-size: 100%; min-block-size: 100dvh; overflow-wrap: anywhere; }
+:where(main, section, article, aside, nav, header, footer, form, fieldset) { min-inline-size: 0; }
+.flex > *, .grid > * { min-inline-size: 0; }
+
+/* Scale the readable page area without stretching content across an entire 4K panel. */
+body > :is(main, section, div).max-w-7xl,
+body > :is(main, section, div).max-w-6xl,
+body > :is(main, section, div).max-w-5xl,
+body > :is(main, section, div).max-w-4xl,
+footer > .max-w-7xl {
+    inline-size: 100%;
+    max-inline-size: var(--page-max);
+    margin-inline: auto;
+    padding-inline: var(--page-gutter);
+}
+.app-responsive h1 { font-size: clamp(1.5rem, 1.1rem + 1.5vw, 2.5rem); line-height: 1.25; }
+.app-responsive h2 { overflow-wrap: anywhere; }
+.app-responsive :is(p, h1, h2, h3, h4, label, td, th, code, pre) { overflow-wrap: anywhere; }
+.app-responsive :is(pre, code) { max-inline-size: 100%; white-space: pre-wrap; word-break: break-word; }
+
+img, video { display: block; max-inline-size: 100%; block-size: auto; object-fit: cover; }
+iframe, canvas, svg { max-inline-size: 100%; }
+img.object-contain { object-fit: contain; }
+:is([class*="aspect-"]) > img.h-full { block-size: 100%; }
+
+/* Touch targets: size the hit area, not the icon inside it. */
+.app-responsive a[href], .app-responsive button, .app-responsive [role="button"] {
+    min-block-size: var(--touch-size);
+    min-inline-size: var(--touch-size);
+    max-inline-size: 100%;
+    touch-action: manipulation;
+}
+a { display: inline-flex; align-items: center; }
+.app-responsive :is(button, [role="button"]) { white-space: normal; }
+.app-responsive :is(a, button, input, select, textarea):focus-visible {
+    outline: .1875rem solid #6366f1;
+    outline-offset: .1875rem;
+}
+
+/* Keep iOS from zooming form fields. All values can shrink within a flex/grid track. */
+.app-responsive :is(input, select, textarea) {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+.app-responsive :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea) {
+    min-block-size: var(--touch-size);
+}
+.app-responsive textarea { resize: vertical; }
+.app-responsive form.flex { flex-wrap: wrap; }
+.responsive-toolbar { flex-wrap: wrap; }
+.responsive-toolbar > form { flex: 1 1 34rem; max-inline-size: 100%; }
+.app-responsive input[type="file"] { inline-size: 100%; }
+.app-responsive input[type="file"]::file-selector-button { min-block-size: var(--touch-size); font: inherit; }
+.app-responsive :is(input[type="checkbox"], input[type="radio"]) { flex-shrink: 0; }
+.app-responsive label:has(input[type="checkbox"], input[type="radio"]) { min-block-size: var(--touch-size); }
+
+/* Intrinsic product grids retain card proportions even when the catalogue is sparse. */
+.responsive-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 17.5rem), 1fr));
+    gap: var(--layout-gap);
+}
+.responsive-auto-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: var(--layout-gap);
+}
+
+/* Every table scrolls locally. Never conceal horizontal overflow on the whole page. */
+.responsive-table {
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 #f1f5f9;
+}
+.responsive-table > table { inline-size: 100%; border-collapse: collapse; }
+.responsive-table > table[data-responsive="wide"] { min-inline-size: 40rem; }
+.responsive-table :is(th, td) { overflow-wrap: anywhere; }
+.responsive-table td.whitespace-nowrap { white-space: normal; }
+.responsive-table :is(button, a) { flex-shrink: 0; }
+
+/* Payment controls and history toolbar keep their labels readable. */
+#sectionMomo .grid-cols-3 {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+}
+#sectionMomo .momo-amt-chip { overflow-wrap: anywhere; padding: .75rem .5rem; }
+#sectionMomo > *, #sectionCard > * { min-inline-size: 0; }
+#momoCheckoutButton, #btnSubmitCard { min-block-size: 3rem; }
+#btnHistAll, #btnHistMomo, #btnHistCard { min-block-size: var(--touch-size); }
+
+/* Dialogs, lightboxes and toasts must fit the visual viewport, including long API errors. */
+.swal2-container { padding: var(--page-gutter); }
+.swal2-container .swal2-popup { inline-size: min(100%, 36rem); max-inline-size: 100%; padding: clamp(1rem, 3vw, 2rem); }
+.swal2-container .swal2-title { font-size: clamp(1.375rem, 1rem + 1.5vw, 2rem); overflow-wrap: anywhere; }
+.swal2-container .swal2-html-container { margin-inline: 0; overflow-wrap: anywhere; word-break: break-word; }
+.swal2-container .swal2-actions { gap: .5rem; flex-wrap: wrap; }
+.swal2-container .swal2-actions button { margin: 0; }
+#floatingToast { inline-size: min(25rem, calc(100% - 2 * var(--page-gutter))); inset-inline-end: var(--page-gutter); }
+#systemAnnouncementBox { max-block-size: calc(100dvh - 2 * var(--page-gutter)); }
+#lightboxMainImg { max-block-size: 75dvh; }
+[id$="Modal"] > div, #lightbox > div { max-inline-size: 100%; max-block-size: calc(100dvh - 2 * var(--page-gutter)); }
+
+/* Mobile: single-column forms, wrap toolbars and prevent intrinsic-width flex items. */
+@media (max-width: 575.98px) {
+    .app-responsive form .grid { grid-template-columns: minmax(0, 1fr); }
+    .app-responsive form .grid > [class*="col-span-"] { grid-column: 1 / -1; }
+    .app-responsive form .flex:not(.flex-col) { flex-wrap: wrap; }
+    .app-responsive form .flex > :is(input, select, textarea) { flex: 1 1 100%; inline-size: 100%; }
+    .app-responsive form button[type="submit"] { max-inline-size: 100%; }
+    .app-responsive .min-w-\[140px\] { min-inline-size: 0; }
+    #sectionMomo, #sectionCard { gap: 1rem; }
+    #sectionMomo > div, #sectionCard > div { padding: clamp(1rem, 4vw, 1.5rem); }
+    #tabMomoBtn, #tabCardBtn { flex: 1 1 0; font-size: .875rem; }
+    #sectionCard .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .app-responsive [class*="max-h-"][class*="vh"] { max-block-size: 90dvh; }
+    #floatingToast { inset-block-start: 1rem; }
+}
+
+/* Tablet portrait and landscape: generous gutters with shrinkable main/aside tracks. */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    :root { --page-gutter: clamp(1rem, 3vw, 1.75rem); }
+    .responsive-card-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 17.5rem), 1fr)); }
+}
+
+@media (min-width: 1024px) {
+    :root { --layout-gap: clamp(1.25rem, 1.5vw, 2rem); }
+}
+@media (min-width: 1920px) {
+    :root { --page-gutter: 2rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    body { opacity: 1; }
+    [data-aos] { opacity: 1 !important; transform: none !important; }
+}

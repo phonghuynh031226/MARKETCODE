@@ -1,24 +1,19 @@
 <?php
+declare(strict_types=1);
 $pageTitle = "Nạp Tiền Tài Khoản - Ví MoMo & Thẻ Cào 24/7";
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/database.php';
+require_login();
 
 if (!isset($pdo) || $pdo === null) {
     $pdo = Database::getInstance();
 }
 
-if (isset($_GET['demo']) || isset($_GET['preview'])) {
-    if (!isset($_SESSION['user_id'])) {
-        $_SESSION['user_id'] = 1;
-    }
-}
-require_login();
-
 $user = current_user();
 $user_id = $user['id'];
 $currentUser = $user;
 $currentBalance = $user ? (float)$user['balance'] : 0;
-$naptien_memo = "NAPTIEN " . $user_id;
+$naptien_memo = get_setting('bank_prefix', 'NAPTIEN') . ' ' . $user['public_id'];
 
 
 
@@ -115,7 +110,7 @@ require_once __DIR__ . '/includes/navbar.php';
     <!-- 2. PHƯƠNG THỨC 1: VÍ MOMO (2 CỘT TÁCH BIỆT CÂN ĐỐI)   -->
     <!-- ===================================================== -->
     <section id="sectionMomo" class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-        
+
         <!-- Cột Trái: Chọn mệnh giá & Thông tin ví nhận tiền -->
         <div class="lg:col-span-7 bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-7 shadow-sm flex flex-col justify-between space-y-6">
             <div class="space-y-6">
@@ -128,8 +123,8 @@ require_once __DIR__ . '/includes/navbar.php';
                         foreach ($momoAmounts as $idx => $amt):
                             $activeClass = ($amt === 100000) ? 'active' : '';
                         ?>
-                        <button type="button" onclick="selectMomoAmount(<?= $amt ?>, this)" class="momo-amt-chip <?= $activeClass ?> py-3 px-2 rounded-2xl border border-slate-200/90 text-xs sm:text-sm font-bold text-slate-700 bg-slate-50/50 hover:bg-white hover:border-slate-300 text-center cursor-pointer">
-                            <?= number_format($amt, 0, ',', '.') ?> ₫
+                        <button type="button" onclick="selectMomoAmount(<?= e($amt) ?>, this)" class="momo-amt-chip <?= e($activeClass) ?> py-3 px-2 rounded-2xl border border-slate-200/90 text-xs sm:text-sm font-bold text-slate-700 bg-slate-50/50 hover:bg-white hover:border-slate-300 text-center cursor-pointer">
+                            <?= e(number_format((float)($amt), 0, ',', '.')) ?> ₫
                         </button>
                         <?php endforeach; ?>
                     </div>
@@ -165,7 +160,7 @@ require_once __DIR__ . '/includes/navbar.php';
                 <h2 class="text-lg font-extrabold">Sẵn sàng nạp <span id="momoCheckoutAmount">100.000 ₫</span>?</h2>
                 <p class="text-xs text-pink-100 mt-2 max-w-xs">Tối thiểu 10.000 ₫ · Tối đa 50.000.000 ₫ mỗi giao dịch</p>
             </div>
-            <input type="hidden" id="momoCsrfToken" value="<?= htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') ?>">
+            <input type="hidden" id="momoCsrfToken" value="<?= e(csrf_token()) ?>">
             <button type="button" id="momoCheckoutButton" onclick="startMomoPayment()" class="w-full max-w-xs px-5 py-3.5 rounded-2xl bg-white text-[#A50064] font-extrabold text-sm hover:bg-pink-50 active:scale-[.98] transition-all shadow-lg">
                 <i class="fa-solid fa-arrow-up-right-from-square mr-2"></i>Thanh toán với MoMo
             </button>
@@ -177,11 +172,11 @@ require_once __DIR__ . '/includes/navbar.php';
     <!-- 3. PHƯƠNG THỨC 2: NẠP THẺ CÀO (GỌN ĐẸP, 2 CỘT)         -->
     <!-- ===================================================== -->
     <section id="sectionCard" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-        
+
         <!-- Cột Trái: Form Nạp Thẻ Cào -->
         <div class="lg:col-span-7 bg-white rounded-3xl border border-slate-200/80 p-6 sm:p-7 shadow-sm flex flex-col justify-between">
             <form id="cardChargingForm" onsubmit="handleCardSubmit(event)" class="space-y-5">
-                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
 
                 <!-- Chọn nhà mạng dạng 4 thẻ ngang -->
                 <div>
@@ -197,9 +192,9 @@ require_once __DIR__ . '/includes/navbar.php';
                         foreach ($telcoList as $tIdx => $t):
                         ?>
                         <label class="telco-card cursor-pointer">
-                            <input type="radio" name="telco" value="<?= $t['code'] ?>" <?= $tIdx === 0 ? 'checked' : '' ?> class="sr-only">
+                            <input type="radio" name="telco" value="<?= e($t['code']) ?>" <?= e($tIdx === 0 ? 'checked' : '') ?> class="sr-only">
                             <div class="p-3 rounded-2xl border-2 border-slate-200 bg-white hover:border-slate-300 text-center transition-all">
-                                <span class="font-black text-sm block <?= $t['color'] ?>"><?= $t['name'] ?></span>
+                                <span class="font-black text-sm block <?= e($t['color']) ?>"><?= e($t['name']) ?></span>
                                 <span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 mt-1">CK -15%</span>
                             </div>
                         </label>
@@ -261,7 +256,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
                 <!-- Bảng chiết khấu ngắn gọn -->
                 <div class="rounded-2xl border border-slate-200 overflow-hidden mb-4">
-                    <table class="w-full text-xs">
+                    <div class="responsive-table" role="region" aria-label="Bảng dữ liệu, cuộn ngang khi cần" tabindex="0"><table data-responsive="compact" class="w-full text-xs">
                         <thead class="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] border-b border-slate-200">
                             <tr>
                                 <th class="py-2 px-3 text-left">Mệnh giá</th>
@@ -275,7 +270,7 @@ require_once __DIR__ . '/includes/navbar.php';
                             <tr><td class="py-2 px-3 font-medium">200.000 ₫</td><td class="py-2 px-3 text-center text-rose-500 font-semibold">15%</td><td class="py-2 px-3 text-right font-bold text-emerald-600">170.000 ₫</td></tr>
                             <tr><td class="py-2 px-3 font-medium">500.000 ₫</td><td class="py-2 px-3 text-center text-rose-500 font-semibold">15%</td><td class="py-2 px-3 text-right font-bold text-emerald-600">425.000 ₫</td></tr>
                         </tbody>
-                    </table>
+                    </table></div>
                 </div>
             </div>
 
@@ -310,7 +305,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
         <!-- Bảng danh sách giao dịch -->
         <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
+            <div class="responsive-table" role="region" aria-label="Bảng dữ liệu, cuộn ngang khi cần" tabindex="0"><table data-responsive="wide" class="w-full text-left text-sm">
                 <thead>
                     <tr class="text-[10px] uppercase text-slate-400 font-extrabold bg-slate-50/70 border-b border-slate-100">
                         <th class="py-3 px-5">Phương thức</th>
@@ -331,10 +326,10 @@ require_once __DIR__ . '/includes/navbar.php';
                                 MoMo
                             </span>
                         </td>
-                        <td class="py-3.5 px-5 font-mono text-xs text-slate-500"><?= htmlspecialchars($b['trans_id']) ?></td>
-                        <td class="py-3.5 px-5 text-xs text-slate-700 font-medium"><?= htmlspecialchars($b['transfer_content']) ?></td>
-                        <td class="py-3.5 px-5 font-extrabold text-emerald-600">+<?= number_format($b['amount'], 0, ',', '.') ?> ₫</td>
-                        <td class="py-3.5 px-5 text-xs text-slate-400"><?= date('H:i d/m/Y', strtotime($b['created_at'])) ?></td>
+                        <td class="py-3.5 px-5 font-mono text-xs text-slate-500"><?= e($b['trans_id']) ?></td>
+                        <td class="py-3.5 px-5 text-xs text-slate-700 font-medium"><?= e($b['transfer_content']) ?></td>
+                        <td class="py-3.5 px-5 font-extrabold text-emerald-600">+<?= e(number_format((float)($b['amount']), 0, ',', '.')) ?> ₫</td>
+                        <td class="py-3.5 px-5 text-xs text-slate-400"><?= e(date('H:i d/m/Y', strtotime($b['created_at']))) ?></td>
                         <td class="py-3.5 px-5 text-center">
                             <?php if ($b['status'] === 'success'): ?>
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-check text-[9px]"></i>Thành công</span>
@@ -349,10 +344,10 @@ require_once __DIR__ . '/includes/navbar.php';
                     <?php foreach ($recentMomo as $m): ?>
                     <tr class="hist-row hist-momo hover:bg-slate-50/50 transition-colors">
                         <td class="py-3.5 px-5"><span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black bg-pink-50 text-[#A50064] border border-pink-200">MoMo API</span></td>
-                        <td class="py-3.5 px-5 font-mono text-xs text-slate-500"><?= htmlspecialchars($m['order_id'], ENT_QUOTES, 'UTF-8') ?></td>
+                        <td class="py-3.5 px-5 font-mono text-xs text-slate-500"><?= e($m['order_id']) ?></td>
                         <td class="py-3.5 px-5 text-xs text-slate-700 font-medium">Nạp ví qua cổng MoMo</td>
-                        <td class="py-3.5 px-5 font-extrabold text-slate-900"><?= number_format((int)$m['amount'], 0, ',', '.') ?> ₫</td>
-                        <td class="py-3.5 px-5 text-xs text-slate-400"><?= date('H:i d/m/Y', strtotime($m['created_at'])) ?></td>
+                        <td class="py-3.5 px-5 font-extrabold text-slate-900"><?= e(number_format((float)((int)$m['amount']), 0, ',', '.')) ?> ₫</td>
+                        <td class="py-3.5 px-5 text-xs text-slate-400"><?= e(date('H:i d/m/Y', strtotime($m['created_at']))) ?></td>
                         <td class="py-3.5 px-5 text-center">
                             <?php if ($m['status'] === 'success'): ?>
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Thành công</span>
@@ -371,18 +366,18 @@ require_once __DIR__ . '/includes/navbar.php';
                         <td class="py-3.5 px-5">
                             <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black bg-amber-50 text-amber-800 border border-amber-200">
                                 <i class="fa-solid fa-sim-card text-xs"></i>
-                                <?= htmlspecialchars($c['telco']) ?>
+                                <?= e($c['telco']) ?>
                             </span>
                         </td>
-                        <td class="py-3.5 px-5 font-mono text-xs text-slate-500"><?= htmlspecialchars($c['request_id'] ?? ('CARD-' . $c['id'])) ?></td>
-                        <td class="py-3.5 px-5 font-mono text-xs text-slate-600">Seri: <?= htmlspecialchars($c['serial']) ?></td>
+                        <td class="py-3.5 px-5 font-mono text-xs text-slate-500"><?= e($c['request_id'] ?? ('CARD-' . public_reference('card_transactions', (int)$c['id']))) ?></td>
+                        <td class="py-3.5 px-5 font-mono text-xs text-slate-600">Seri: <?= e($c['serial']) ?></td>
                         <td class="py-3.5 px-5">
-                            <span class="font-extrabold text-slate-900"><?= number_format($c['declared_amount'], 0, ',', '.') ?> ₫</span>
+                            <span class="font-extrabold text-slate-900"><?= e(number_format((float)($c['declared_amount']), 0, ',', '.')) ?> ₫</span>
                             <?php if (!empty($c['received_amount']) && $c['received_amount'] > 0): ?>
-                                <span class="block text-[10px] font-bold text-emerald-600">+<?= number_format($c['received_amount'], 0, ',', '.') ?> ₫ nhận</span>
+                                <span class="block text-[10px] font-bold text-emerald-600">+<?= e(number_format((float)($c['received_amount']), 0, ',', '.')) ?> ₫ nhận</span>
                             <?php endif; ?>
                         </td>
-                        <td class="py-3.5 px-5 text-xs text-slate-400"><?= date('H:i d/m/Y', strtotime($c['created_at'])) ?></td>
+                        <td class="py-3.5 px-5 text-xs text-slate-400"><?= e(date('H:i d/m/Y', strtotime($c['created_at']))) ?></td>
                         <td class="py-3.5 px-5 text-center">
                             <?php if ($c['status'] === 'success'): ?>
                                 <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200"><i class="fa-solid fa-check text-[9px]"></i>Thành công</span>
@@ -405,7 +400,7 @@ require_once __DIR__ . '/includes/navbar.php';
                     </tr>
                     <?php endif; ?>
                 </tbody>
-            </table>
+            </table></div>
         </div>
     </section>
 
@@ -471,14 +466,13 @@ async function startMomoPayment() {
         try {
             data = JSON.parse(rawText);
         } catch (parseErr) {
-            console.error('MoMo raw response:', rawText);
-            const cleanError = rawText.replace(/<[^>]*>?/gm, '').trim().substring(0, 200);
-            throw new Error(cleanError || 'Máy chủ trả về dữ liệu không hợp lệ.');
+            console.error('MoMo API returned invalid JSON; HTTP', response.status);
+            throw new Error('Máy chủ thanh toán trả về dữ liệu không hợp lệ (HTTP ' + response.status + '). Vui lòng liên hệ quản trị viên kiểm tra API MoMo và nhật ký PHP.');
         }
         if (!response.ok || !data.success || !data.pay_url) throw new Error(data.message || 'Không tạo được giao dịch MoMo.');
         window.location.assign(data.pay_url);
     } catch (error) {
-        Swal.fire('Không thể thanh toán', error.message || 'Vui lòng thử lại sau.', 'error');
+        Swal.fire({titleText: 'Không thể thanh toán', text: error.message || 'Vui lòng thử lại sau.', icon: 'error'});
         button.disabled = false;
         button.innerHTML = '<i class="fa-solid fa-arrow-up-right-from-square mr-2"></i>Thanh toán với MoMo';
         updateMomoAmount();
@@ -537,7 +531,7 @@ function copyText(text, label) {
                 timerProgressBar: true
             }).fire({
                 icon: 'success',
-                title: 'Đã sao chép ' + label + '!'
+                titleText: 'Đã sao chép ' + label + '!'
             });
         }
     };
@@ -613,7 +607,7 @@ async function handleCardSubmit(e) {
                 location.reload();
             });
         } else {
-            Swal.fire('Thất Bại', data.message || 'Không thể xử lý thẻ cào. Vui lòng thử lại!', 'error');
+            Swal.fire({titleText: 'Thất Bại', text: data.message || 'Không thể xử lý thẻ cào. Vui lòng thử lại!', icon: 'error'});
         }
     } catch (err) {
         Swal.fire('Lỗi Kết Nối', 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau!', 'error');
@@ -624,7 +618,7 @@ async function handleCardSubmit(e) {
 }
 
 // 8. Tự động kiểm tra số dư (Polling 4.5s)
-let lastTxId = <?= !empty($recentBanks[0]['id']) ? (int)$recentBanks[0]['id'] : 0 ?>;
+let lastTxId = <?= js(!empty($recentBanks[0]['public_id']) ? $recentBanks[0]['public_id'] : '') ?>;
 setInterval(async () => {
     try {
         const res = await fetch('<?= BASE_URL ?>/api/check_bank_status.php?last_id=' + lastTxId);
@@ -636,7 +630,7 @@ setInterval(async () => {
             Swal.fire({
                 icon: 'success',
                 title: 'Nạp Tiền Thành Công!',
-                html: `Bạn vừa được cộng <b>${data.amount_fmt}</b> vào tài khoản!<br>Số dư mới: <b>${data.new_balance}</b>`,
+                text: `Bạn vừa được cộng ${data.amount_fmt} vào tài khoản! Số dư mới: ${data.new_balance}`,
                 confirmButtonText: 'Xác Nhận',
                 confirmButtonColor: '#A50064'
             }).then(() => {

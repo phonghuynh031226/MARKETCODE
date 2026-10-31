@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 $pageTitle = "Chính Sách Bảo Hành & Cam Kết 100%";
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/includes/header.php';
@@ -109,7 +110,7 @@ require_once __DIR__ . '/includes/navbar.php';
                 <a href="https://t.me/admin_marketcode" target="_blank" class="px-5 py-2.5 rounded-xl bg-white text-indigo-700 font-bold text-xs shadow-sm hover:bg-slate-50 transition-colors flex items-center gap-2">
                     <i class="fa-brands fa-telegram text-base"></i>Telegram Kỹ Thuật
                 </a>
-                <a href="tel:<?= get_setting('contact_hotline', '0988.888.888') ?>" class="px-5 py-2.5 rounded-xl bg-white/20 border border-white/30 text-white font-bold text-xs hover:bg-white/30 transition-colors flex items-center gap-2">
+                <a href="tel:<?= e(get_setting('contact_hotline', '0988.888.888')) ?>" class="px-5 py-2.5 rounded-xl bg-white/20 border border-white/30 text-white font-bold text-xs hover:bg-white/30 transition-colors flex items-center gap-2">
                     <i class="fa-solid fa-phone"></i>Hotline
                 </a>
             </div>

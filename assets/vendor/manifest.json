@@ -1,0 +1,74 @@
+[
+  {
+    "file": "tailwind.js",
+    "source": "https://cdn.tailwindcss.com",
+    "resolvedUrl": "https://cdn.tailwindcss.com/3.4.17",
+    "sha384": "sha384-igm5BeiBt36UU4gqwWS7imYmelpTsZlQ45FZf+XBn9MuJbn4nQr7yx1yFydocC/K",
+    "bytes": 407279,
+    "retrievedAt": "2026-10-31T05:17:37.1806809Z",
+    "version": "3.4.17",
+    "license": "MIT",
+    "licenseFile": "tailwind.LICENSE",
+    "licenseSource": "https://cdn.jsdelivr.net/npm/tailwindcss@3.4.17/LICENSE"
+  },
+  {
+    "file": "chart.js",
+    "source": "https://cdn.jsdelivr.net/npm/chart.js",
+    "resolvedUrl": "https://cdn.jsdelivr.net/npm/chart.js",
+    "sha384": "sha384-Emf5ZVIUiarAdhkgtqK+5/Z5qIvM6QoVrS+qAVtfyZVuD5lIHrac0me485+Antp0",
+    "bytes": 210082,
+    "retrievedAt": "2026-10-31T05:17:37.6501124Z",
+    "version": "4.6.1",
+    "license": "MIT",
+    "licenseFile": "chart.LICENSE",
+    "licenseSource": "https://cdn.jsdelivr.net/npm/chart.js@4.6.1/LICENSE.md"
+  },
+  {
+    "file": "sweetalert2.js",
+    "source": "https://cdn.jsdelivr.net/npm/sweetalert2@11",
+    "resolvedUrl": "https://cdn.jsdelivr.net/npm/sweetalert2@11",
+    "sha384": "sha384-nLoOnA/BDh8A/jxqtckg4DumuCGOBYUnNJLZdQz/zfYNp3wcjGSoWTAzgko06G/2",
+    "bytes": 79150,
+    "retrievedAt": "2026-10-31T05:17:37.8693398Z",
+    "version": "11.26.25",
+    "license": "MIT",
+    "licenseFile": "sweetalert2.LICENSE",
+    "licenseSource": "https://cdn.jsdelivr.net/npm/sweetalert2@11.26.25/LICENSE"
+  },
+  {
+    "file": "sweetalert2.min.css",
+    "source": "https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css",
+    "resolvedUrl": "https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css",
+    "sha384": "sha384-dCW5imOdApH6OwpFau8cZNKjqVbJYnCA5q+8YsMYP3XwXKsV6Jfz1u6MZLnXaBsS",
+    "bytes": 30251,
+    "retrievedAt": "2026-10-31T05:17:38.0801564Z",
+    "version": "11.26.25",
+    "license": "MIT",
+    "licenseFile": "sweetalert2.LICENSE",
+    "licenseSource": "https://cdn.jsdelivr.net/npm/sweetalert2@11.26.25/LICENSE"
+  },
+  {
+    "file": "aos.js",
+    "source": "https://unpkg.com/aos@2.3.1/dist/aos.js",
+    "resolvedUrl": "https://unpkg.com/aos@2.3.1/dist/aos.js",
+    "sha384": "sha384-wziAfh6b/qT+3LrqebF9WeK4+J5sehS6FA10J1t3a866kJ/fvU5UwofWnQyzLtwu",
+    "bytes": 14239,
+    "retrievedAt": "2026-10-31T05:17:38.3345276Z",
+    "version": "2.3.1",
+    "license": "MIT",
+    "licenseFile": "aos.LICENSE",
+    "licenseSource": "https://cdn.jsdelivr.net/npm/aos@2.3.1/LICENSE"
+  },
+  {
+    "file": "aos.css",
+    "source": "https://unpkg.com/aos@2.3.1/dist/aos.css",
+    "resolvedUrl": "https://unpkg.com/aos@2.3.1/dist/aos.css",
+    "sha384": "sha384-/rJKQnzOkEo+daG0jMjU1IwwY9unxt1NBw3Ef2fmOJ3PW/TfAg2KXVoWwMZQZtw9",
+    "bytes": 26053,
+    "retrievedAt": "2026-10-31T05:17:38.5699459Z",
+    "version": "2.3.1",
+    "license": "MIT",
+    "licenseFile": "aos.LICENSE",
+    "licenseSource": "https://cdn.jsdelivr.net/npm/aos@2.3.1/LICENSE"
+  }
+]

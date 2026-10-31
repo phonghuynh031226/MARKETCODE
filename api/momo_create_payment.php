@@ -1,15 +1,10 @@
 <?php
+declare(strict_types=1);
+require_once __DIR__ . '/../includes/momo_json.php';
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
 
 header('Content-Type: application/json; charset=utf-8');
-
-function momo_json_response(int $status, array $payload): void
-{
-    http_response_code($status);
-    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
-}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !is_logged()) {
     momo_json_response(401, ['success' => false, 'message' => 'Vui lòng đăng nhập để nạp tiền.']);
@@ -40,12 +35,15 @@ $user = current_user();
 if (!$user || empty($user['id'])) {
     momo_json_response(401, ['success' => false, 'message' => 'Vui lòng đăng nhập để nạp tiền.']);
 }
+if (!security_rate_limit('momo-create:' . (int)$user['id'], 10, 300)) {
+    momo_json_response(429, ['success' => false, 'message' => 'Bạn tạo giao dịch quá nhanh. Vui lòng thử lại sau ít phút.']);
+}
 
 try {
     $pdo = Database::getInstance();
     $orderId = 'MOMO' . date('YmdHis') . strtoupper(bin2hex(random_bytes(6)));
     $requestId = 'REQ' . date('YmdHis') . strtoupper(bin2hex(random_bytes(6)));
-    $orderInfo = 'Nap tien tai khoan #' . (int)$user['id'];
+    $orderInfo = 'Nap tien tai khoan ' . $user['public_id'];
     $extraData = '';
     if ($momo['public_base_url'] === '' || !str_starts_with($momo['public_base_url'], 'https://')) {
         momo_json_response(503, ['success' => false, 'message' => 'Cần cấu hình MOMO_PUBLIC_BASE_URL là địa chỉ HTTPS công khai để MoMo gửi kết quả thanh toán.']);
@@ -53,8 +51,8 @@ try {
     $redirectUrl = $momo['public_base_url'] . '/deposit.php?momo_return=1&order_id=' . rawurlencode($orderId);
     $ipnUrl = $momo['public_base_url'] . '/api/momo_ipn.php';
 
-    $insert = $pdo->prepare("INSERT INTO momo_transactions (order_id, request_id, user_id, amount, status) VALUES (?, ?, ?, ?, 'pending')");
-    $insert->execute([$orderId, $requestId, (int)$user['id'], $amount]);
+    $insert = $pdo->prepare("INSERT INTO momo_transactions (public_id, order_id, request_id, user_id, amount, status) VALUES (?, ?, ?, ?, ?, 'pending')");
+    $insert->execute([uuid_v4(), $orderId, $requestId, (int)$user['id'], $amount]);
 
     $rawSignature = 'accessKey=' . $momo['access_key']
         . '&amount=' . $amount
@@ -128,5 +126,5 @@ try {
     momo_json_response(200, ['success' => true, 'pay_url' => $payUrl, 'order_id' => $orderId]);
 } catch (Throwable $e) {
     error_log('MoMo create payment exception: ' . $e->getMessage());
-    momo_json_response(500, ['success' => false, 'message' => 'Lỗi kết nối CSDL hoặc hệ thống: ' . $e->getMessage()]);
+    momo_json_response(500, ['success' => false, 'message' => 'Hệ thống thanh toán gặp lỗi. Vui lòng liên hệ quản trị viên kiểm tra nhật ký PHP.']);
 }

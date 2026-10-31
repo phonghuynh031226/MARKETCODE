@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 $pageTitle = $pageTitle ?? "Đăng Nhập / Đăng Ký Tài Khoản";
 require_once __DIR__ . '/config/config.php';
 
@@ -44,7 +45,7 @@ require_once __DIR__ . '/includes/navbar.php';
 }
 </style>
 
-<div class="flex-1 flex items-center justify-center py-10 sm:py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-[#F8FAFC] min-h-[calc(100vh-140px)]">
+<div class="flex-1 flex items-center justify-center py-10 sm:py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-[#F8FAFC] min-h-[calc(100dvh-140px)]">
     <!-- 1. Quầng Sáng Mesh Gradient Nổi Bật Phía Sau -->
     <div class="absolute -top-28 -left-20 w-[520px] h-[520px] bg-gradient-to-tr from-indigo-500/25 via-indigo-300/15 to-transparent rounded-full blur-[110px] pointer-events-none mesh-pulse-1"></div>
     <div class="absolute top-1/2 -right-28 w-[480px] h-[480px] bg-gradient-to-bl from-cyan-400/25 via-sky-300/15 to-transparent rounded-full blur-[120px] pointer-events-none mesh-pulse-2"></div>
@@ -55,7 +56,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
     <!-- 2. Khung Form Chính (Floating Card & Layered Shadows chuẩn Stripe/Linear) -->
     <div class="max-w-4xl w-full grid grid-cols-1 lg:grid-cols-12 rounded-3xl bg-white/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(15,23,42,0.15)] border border-slate-200/80 overflow-hidden relative z-10 transition-all duration-300">
-        
+
         <!-- NỬA BÊN TRÁI: BRAND PANEL (TINH CHỈNH SANG TRỌNG) -->
         <div class="hidden lg:flex lg:col-span-5 flex-col justify-between p-8 md:p-10 bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 text-white relative overflow-hidden select-none">
             <!-- Vòng tròn ánh sáng mờ đa tầng -->
@@ -66,7 +67,7 @@ require_once __DIR__ . '/includes/navbar.php';
             <!-- Top Header & Cam kết thương hiệu -->
             <div class="relative z-10 space-y-6">
                 <!-- Logo Brand -->
-                <a href="<?= BASE_URL ?>/" class="flex items-center gap-3 group">
+                <a href="<?= e(BASE_URL) ?>/" class="flex items-center gap-3 group">
                     <?php
                     $authLogo = get_setting('site_logo', '');
                     $authLogoUrl = '';
@@ -78,7 +79,7 @@ require_once __DIR__ . '/includes/navbar.php';
                     }
                     ?>
                     <?php if (!empty($authLogoUrl)): ?>
-                        <img src="<?= htmlspecialchars($authLogoUrl) ?>" alt="Logo" class="w-11 h-11 rounded-2xl object-cover border border-white/20 shadow-inner group-hover:scale-105 transition-transform">
+                        <img src="<?= e($authLogoUrl) ?>" alt="Logo" class="w-11 h-11 rounded-2xl object-cover border border-white/20 shadow-inner group-hover:scale-105 transition-transform">
                     <?php else: ?>
                         <div class="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-inner group-hover:scale-105 transition-transform">
                             <i class="fa-solid fa-code text-lg"></i>
@@ -139,7 +140,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
             <!-- Footer: Security Standard -->
             <div class="relative z-10 pt-6 border-t border-white/15 text-[11px] text-indigo-200 flex items-center justify-between font-medium">
-                <span class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-300"></i> BCRYPT & CSRF Protected</span>
+                <span class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-300"></i> Argon2id & CSRF Protected</span>
                 <span class="flex items-center gap-1.5"><i class="fa-solid fa-lock text-indigo-200"></i> SSL 256-bit</span>
             </div>
         </div>
@@ -148,11 +149,11 @@ require_once __DIR__ . '/includes/navbar.php';
         <div class="lg:col-span-7 p-6 sm:p-10 flex flex-col justify-center bg-white/95">
             <!-- 3. Thanh Chuyển Đổi Tab Dạng Segmented Control (Pill Button) -->
             <div class="flex rounded-2xl bg-slate-100 p-1.5 mb-6 border border-slate-200/60 shadow-inner">
-                <button type="button" id="tabBtnLogin" onclick="switchTab('login')" class="flex-1 py-2.5 text-center text-xs sm:text-sm font-extrabold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer <?= $activeTab === 'login' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-900 border border-transparent' ?>">
+                <button type="button" id="tabBtnLogin" onclick="switchTab('login')" class="flex-1 py-2.5 text-center text-xs sm:text-sm font-extrabold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer <?= e($activeTab === 'login' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-900 border border-transparent') ?>">
                     <i class="fa-solid fa-arrow-right-to-bracket text-xs"></i>
                     <span>Đăng Nhập</span>
                 </button>
-                <button type="button" id="tabBtnRegister" onclick="switchTab('register')" class="flex-1 py-2.5 text-center text-xs sm:text-sm font-extrabold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer <?= $activeTab === 'register' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-900 border border-transparent' ?>">
+                <button type="button" id="tabBtnRegister" onclick="switchTab('register')" class="flex-1 py-2.5 text-center text-xs sm:text-sm font-extrabold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer <?= e($activeTab === 'register' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-900 border border-transparent') ?>">
                     <i class="fa-solid fa-user-plus text-xs"></i>
                     <span>Tạo Tài Khoản</span>
                 </button>
@@ -162,7 +163,7 @@ require_once __DIR__ . '/includes/navbar.php';
             <div class="space-y-3 mb-6">
                 <div class="grid grid-cols-3 gap-2.5 sm:gap-3">
                     <!-- Google -->
-                    <a href="<?= BASE_URL ?>/auth/google.php" class="flex items-center justify-center gap-2 py-2.5 px-2 sm:px-3 rounded-2xl border border-slate-200/80 bg-white hover:bg-slate-50/80 hover:border-indigo-300 transition-all shadow-xs group">
+                    <a href="<?= e(BASE_URL) ?>/auth/google.php" class="flex items-center justify-center gap-2 py-2.5 px-2 sm:px-3 rounded-2xl border border-slate-200/80 bg-white hover:bg-slate-50/80 hover:border-indigo-300 transition-all shadow-xs group">
                         <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -172,12 +173,12 @@ require_once __DIR__ . '/includes/navbar.php';
                         <span class="text-xs font-bold text-slate-700">Google</span>
                     </a>
                     <!-- Facebook -->
-                    <a href="<?= BASE_URL ?>/auth/facebook.php" class="flex items-center justify-center gap-2 py-2.5 px-2 sm:px-3 rounded-2xl border border-slate-200/80 bg-white hover:bg-slate-50/80 hover:border-indigo-300 transition-all shadow-xs group">
+                    <a href="<?= e(BASE_URL) ?>/auth/facebook.php" class="flex items-center justify-center gap-2 py-2.5 px-2 sm:px-3 rounded-2xl border border-slate-200/80 bg-white hover:bg-slate-50/80 hover:border-indigo-300 transition-all shadow-xs group">
                         <i class="fa-brands fa-facebook text-blue-600 text-base shrink-0"></i>
                         <span class="text-xs font-bold text-slate-700">Facebook</span>
                     </a>
                     <!-- Zalo -->
-                    <a href="<?= BASE_URL ?>/auth/zalo.php" class="flex items-center justify-center gap-2 py-2.5 px-2 sm:px-3 rounded-2xl border border-slate-200/80 bg-white hover:bg-slate-50/80 hover:border-indigo-300 transition-all shadow-xs group">
+                    <a href="<?= e(BASE_URL) ?>/auth/zalo.php" class="flex items-center justify-center gap-2 py-2.5 px-2 sm:px-3 rounded-2xl border border-slate-200/80 bg-white hover:bg-slate-50/80 hover:border-indigo-300 transition-all shadow-xs group">
                         <span class="w-4 h-4 rounded-full bg-blue-500 text-white font-extrabold text-[9px] flex items-center justify-center shrink-0">Z</span>
                         <span class="text-xs font-bold text-slate-700">Zalo</span>
                     </a>
@@ -190,9 +191,9 @@ require_once __DIR__ . '/includes/navbar.php';
             </div>
 
             <!-- FORM 1: ĐĂNG NHẬP (TAB-CONTENT-ANIMATE) -->
-            <form id="formLogin" onsubmit="handleAuthSubmit(event, 'login')" class="space-y-4 tab-content-animate <?= $activeTab === 'login' ? 'block' : 'hidden' ?>">
+            <form id="formLogin" onsubmit="handleAuthSubmit(event, 'login')" class="space-y-4 tab-content-animate <?= e($activeTab === 'login' ? 'block' : 'hidden') ?>">
                 <input type="hidden" name="action" value="login">
-                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                 <input type="hidden" name="redirect" value="<?= xss_clean($redirectUrl) ?>">
 
                 <!-- Tên đăng nhập / Email -->
@@ -210,7 +211,7 @@ require_once __DIR__ . '/includes/navbar.php';
                 <div>
                     <div class="flex items-center justify-between mb-1.5">
                         <label class="block text-xs font-bold uppercase tracking-wider text-slate-700">Mật khẩu</label>
-                        <a href="<?= BASE_URL ?>/forgot-password" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">Quên mật khẩu?</a>
+                        <a href="<?= e(BASE_URL) ?>/forgot-password" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">Quên mật khẩu?</a>
                     </div>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
@@ -239,9 +240,9 @@ require_once __DIR__ . '/includes/navbar.php';
             </form>
 
             <!-- FORM 2: ĐĂNG KÝ (TAB-CONTENT-ANIMATE) -->
-            <form id="formRegister" onsubmit="handleAuthSubmit(event, 'register')" class="space-y-4 tab-content-animate <?= $activeTab === 'register' ? 'block' : 'hidden' ?>">
+            <form id="formRegister" onsubmit="handleAuthSubmit(event, 'register')" class="space-y-4 tab-content-animate <?= e($activeTab === 'register' ? 'block' : 'hidden') ?>">
                 <input type="hidden" name="action" value="register">
-                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
                 <input type="hidden" name="redirect" value="<?= xss_clean($redirectUrl) ?>">
 
                 <!-- Họ và tên -->
@@ -285,7 +286,7 @@ require_once __DIR__ . '/includes/navbar.php';
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                                 <i class="fa-solid fa-lock text-sm"></i>
                             </div>
-                            <input type="password" id="regPassword" name="password" required placeholder="Tối thiểu 6 ký tự" class="w-full pl-11 pr-11 py-3 rounded-2xl bg-slate-50/80 text-sm text-slate-900 border border-slate-200/80 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400 transition-all duration-200">
+                            <input type="password" id="regPassword" name="password" required placeholder="Tối thiểu 12 ký tự" class="w-full pl-11 pr-11 py-3 rounded-2xl bg-slate-50/80 text-sm text-slate-900 border border-slate-200/80 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400 transition-all duration-200">
                             <button type="button" onclick="togglePasswordVisibility('regPassword', this)" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer" title="Ẩn/Hiện mật khẩu">
                                 <i class="fa-regular fa-eye text-sm"></i>
                             </button>
@@ -332,7 +333,7 @@ require_once __DIR__ . '/includes/navbar.php';
         if (tab === 'login') {
             formReg.classList.add('hidden');
             formReg.classList.remove('tab-content-animate');
-            
+
             formLogin.classList.remove('hidden');
             // Kích hoạt lại animation mượt mà
             void formLogin.offsetWidth;

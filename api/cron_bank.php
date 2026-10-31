@@ -1,54 +1,29 @@
 <?php
-/**
- * Cron Job kiểm tra đối soát giao dịch ngân hàng
- * Có thể đặt lịch Cron chạy 1 - 2 phút/lần:
- * curl -s http://your-domain.com/api/cron_bank.php > /dev/null 2>&1
- */
+declare(strict_types=1);
+
+// Background state changes are CLI-only; no GET endpoint can mutate payment state.
+if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require_once __DIR__ . '/../config/config.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
-$apiKey = $_GET['cron_key'] ?? '';
-$configuredKey = get_setting('cron_security_key', 'marketcode_cron_secret');
-
-// Bảo mật CRON bằng key
-if (!empty($configuredKey) && $apiKey !== $configuredKey && php_sapi_name() !== 'cli') {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Unauthorized cron access']);
-    exit;
-}
-
-if (!$db) {
-    die(json_encode(['success' => false, 'message' => 'Database error']));
-}
-
-$report = [
-    'time'             => date('Y-m-d H:i:s'),
-    'checked_pending'  => 0,
-    'messages'         => []
-];
-
 try {
-    // 1. Quét các giao dịch bank pending quá 60 phút để đánh dấu timeout/cancelled
-    $cancelStmt = $db->prepare("UPDATE bank_transactions SET status = 'cancelled' 
-                               WHERE status = 'pending' AND created_at < NOW() - INTERVAL 120 MINUTE");
-    $cancelStmt->execute();
-    $report['auto_cancelled_stale'] = $cancelStmt->rowCount();
-
-    // 2. Quét thẻ cào pending quá 24h để đánh dấu timeout
-    $cardCancel = $db->prepare("UPDATE card_transactions SET status = 'error', response_message = 'Hết thời gian chờ duyệt (Timeout)' 
-                               WHERE status = 'pending' AND created_at < NOW() - INTERVAL 24 HOUR");
-    $cardCancel->execute();
-    $report['auto_cancelled_cards'] = $cardCancel->rowCount();
-
-    echo json_encode([
-        'success' => true,
-        'report'  => $report
-    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-
-} catch (Exception $e) {
-    echo json_encode([
-        'success' => false,
-        'message' => 'Cron error: ' . $e->getMessage()
-    ]);
+    if (!$db instanceof PDO) { throw new RuntimeException('Database unavailable'); }
+    $db->beginTransaction();
+    $bank = $db->prepare("SELECT id FROM bank_transactions WHERE status = 'pending' AND deleted_at IS NULL AND created_at < NOW() - INTERVAL 120 MINUTE FOR UPDATE");
+    $bank->execute();
+    $bankIds = $bank->fetchAll(PDO::FETCH_COLUMN);
+    $cancelBank = $db->prepare("UPDATE bank_transactions SET status = 'cancelled' WHERE id = ? AND status = 'pending'");
+    foreach ($bankIds as $id) { $cancelBank->execute([(int)$id]); }
+    $card = $db->prepare("SELECT id FROM card_transactions WHERE status = 'pending' AND deleted_at IS NULL AND created_at < NOW() - INTERVAL 24 HOUR FOR UPDATE");
+    $card->execute();
+    $cardIds = $card->fetchAll(PDO::FETCH_COLUMN);
+    $cancelCard = $db->prepare("UPDATE card_transactions SET status = 'error', response_message = 'Hết thời gian chờ duyệt' WHERE id = ? AND status = 'pending'");
+    foreach ($cardIds as $id) { $cancelCard->execute([(int)$id]); }
+    audit_event($db, 'payment.expire_pending', 'payments');
+    $db->commit();
+    echo json_encode(['success' => true, 'expired_bank' => count($bankIds), 'expired_card' => count($cardIds)], JSON_THROW_ON_ERROR) . PHP_EOL;
+} catch (Throwable $error) {
+    if ($db instanceof PDO && $db->inTransaction()) { $db->rollBack(); }
+    error_log('Payment expiration failed: ' . $error->getMessage());
+    echo json_encode(['success' => false, 'message' => 'Background task failed'], JSON_THROW_ON_ERROR) . PHP_EOL;
+    exit(1);
 }

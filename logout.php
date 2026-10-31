@@ -1,5 +1,7 @@
 <?php
+declare(strict_types=1);
 require_once __DIR__ . '/config/config.php';
+security_require_post_csrf();
 
 $_SESSION = [];
 if (ini_get("session.use_cookies")) {

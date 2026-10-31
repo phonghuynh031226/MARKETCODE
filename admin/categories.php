@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 $pageTitle = "Quản Lý Danh Mục Mã Nguồn";
 require_once __DIR__ . '/includes/admin_header.php';
 
@@ -10,7 +11,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save'])) {
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         $error = 'CSRF Token không hợp lệ!';
     } else {
-        $catId = (int)($_POST['category_id'] ?? 0);
+        $rawCategory = $_POST['category_id'] ?? '';
+        $isNewCategory = $rawCategory === '' || $rawCategory === '0';
+        $catId = $isNewCategory ? 0 : public_id_to_internal($db, 'categories', $rawCategory);
         $name = trim($_POST['name'] ?? '');
         $slug = trim($_POST['slug'] ?? '');
         $icon = trim($_POST['icon'] ?? 'fas fa-code');
@@ -22,41 +25,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_save'])) {
             $slug = slugify($name);
         }
 
-        if (empty($name)) {
+        if (!$isNewCategory && $catId <= 0) {
+            $error = 'Danh mục không hợp lệ.';
+        } elseif (empty($name)) {
             $error = 'Tên danh mục không được để trống!';
         } else {
             try {
+                $db->beginTransaction();
+                if ($catId > 0) {
+                    $lock = $db->prepare('SELECT id FROM categories WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+                    $lock->execute([$catId]);
+                    if (!$lock->fetchColumn()) { throw new RuntimeException('Danh mục không tồn tại.'); }
+                }
                 if ($catId > 0) {
                     $stmt = $db->prepare("UPDATE categories SET name = ?, slug = ?, icon = ?, description = ?, sort_order = ?, status = ? WHERE id = ?");
                     $stmt->execute([$name, $slug, $icon, $description, $sortOrder, $status, $catId]);
                     $message = 'Cập nhật danh mục thành công!';
                 } else {
-                    $stmt = $db->prepare("INSERT INTO categories (name, slug, icon, description, sort_order, status) VALUES (?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$name, $slug, $icon, $description, $sortOrder, $status]);
+                    $stmt = $db->prepare("INSERT INTO categories (public_id, name, slug, icon, description, sort_order, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([uuid_v4(), $name, $slug, $icon, $description, $sortOrder, $status]);
+                    $catId = (int)$db->lastInsertId();
                     $message = 'Thêm danh mục mới thành công!';
                 }
-            } catch (Exception $e) {
-                $error = 'Lỗi lưu danh mục (có thể bị trùng Slug): ' . $e->getMessage();
+                audit_event($db, 'category.save', 'categories', $catId > 0 ? public_reference('categories', $catId) : null);
+                $db->commit();
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) { $db->rollBack(); }
+                $error = 'Lỗi lưu danh mục (có thể bị trùng Slug): ' . public_error($e);
             }
         }
     }
 }
 
 // Xử lý Xóa danh mục
-if (isset($_GET['delete_id'])) {
-    $delId = (int)$_GET['delete_id'];
+if (isset($_POST['delete_id'])) {
+    $delId = public_id_to_internal($db, 'categories', $_POST['delete_id']);
     try {
-        $checkProd = $db->prepare("SELECT COUNT(*) FROM products WHERE category_id = ?");
+        if ($delId <= 0) { throw new RuntimeException('Danh mục không hợp lệ.'); }
+        $db->beginTransaction();
+        $lock = $db->prepare('SELECT id FROM categories WHERE id = ? AND deleted_at IS NULL FOR UPDATE');
+        $lock->execute([$delId]);
+        if (!$lock->fetchColumn()) { throw new RuntimeException('Danh mục không tồn tại.'); }
+        $checkProd = $db->prepare("SELECT COUNT(*) FROM products WHERE deleted_at IS NULL AND category_id = ?");
         $checkProd->execute([$delId]);
         if ($checkProd->fetchColumn() > 0) {
             $error = 'Không thể xóa danh mục này vì đang có sản phẩm thuộc danh mục! Vui lòng chuyển hoặc xóa sản phẩm trước.';
         } else {
-            $delStmt = $db->prepare("DELETE FROM categories WHERE id = ?");
+            $delStmt = $db->prepare("UPDATE categories SET deleted_at = NOW(), status = 0 WHERE id = ?");
             $delStmt->execute([$delId]);
             $message = 'Xóa danh mục thành công!';
         }
-    } catch (Exception $e) {
-        $error = 'Lỗi khi xóa: ' . $e->getMessage();
+        audit_event($db, 'category.delete', 'categories', public_reference('categories', $delId));
+        $db->commit();
+    } catch (Throwable $e) {
+        if ($db->inTransaction()) { $db->rollBack(); }
+        $error = 'Lỗi khi xóa: ' . public_error($e);
     }
 }
 
@@ -64,9 +87,9 @@ if (isset($_GET['delete_id'])) {
 $categories = [];
 if ($db) {
     try {
-        $categories = $db->query("SELECT c.*, (SELECT COUNT(*) FROM products WHERE category_id = c.id) as product_count 
-                                 FROM categories c ORDER BY c.sort_order ASC, c.id DESC")->fetchAll();
-    } catch (Exception $e) {}
+        $categories = $db->query("SELECT c.*, (SELECT COUNT(*) FROM products WHERE deleted_at IS NULL AND category_id = c.id) as product_count
+                                 FROM categories c WHERE c.deleted_at IS NULL ORDER BY c.sort_order ASC, c.id DESC")->fetchAll();
+    } catch (Throwable $e) {}
 }
 ?>
 
@@ -84,7 +107,7 @@ if ($db) {
     <!-- Bảng danh mục -->
     <div class="rounded-3xl bg-white border border-slate-200/80 shadow-sm overflow-hidden">
         <div class="w-full overflow-x-auto">
-            <table class="w-full text-left text-sm border-collapse">
+            <div class="responsive-table" role="region" aria-label="Bảng dữ liệu, cuộn ngang khi cần" tabindex="0"><table data-responsive="wide" class="w-full text-left text-sm border-collapse">
                 <thead>
                     <tr class="border-b border-slate-100 text-xs uppercase text-slate-400 bg-slate-50/70 font-semibold tracking-wider">
                         <th class="py-3 px-3 w-12 text-center whitespace-nowrap">ID</th>
@@ -100,7 +123,7 @@ if ($db) {
                     <?php if (!empty($categories)): ?>
                         <?php foreach ($categories as $cat): ?>
                             <tr class="hover:bg-slate-50/60 transition-colors">
-                                <td class="py-3 px-3 w-12 text-center font-mono text-xs text-slate-400 whitespace-nowrap"><?= $cat['id'] ?></td>
+                                <td class="py-3 px-3 w-12 text-center font-mono text-xs text-slate-400 whitespace-nowrap"><?= e(public_reference('categories', (int)$cat['id'])) ?></td>
                                 <td class="py-3 px-3 min-w-[180px]">
                                     <div class="flex items-center gap-2.5">
                                         <div class="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 text-xs">
@@ -113,19 +136,19 @@ if ($db) {
                                     </div>
                                 </td>
                                 <td class="py-3 px-3 font-mono text-xs text-slate-500 whitespace-nowrap"><?= xss_clean($cat['slug']) ?></td>
-                                <td class="py-3 px-2.5 text-center font-bold text-indigo-600 whitespace-nowrap"><?= (int)$cat['product_count'] ?></td>
-                                <td class="py-3 px-2 text-center font-mono text-xs text-slate-600 whitespace-nowrap"><?= $cat['sort_order'] ?></td>
+                                <td class="py-3 px-2.5 text-center font-bold text-indigo-600 whitespace-nowrap"><?= e((int)$cat['product_count']) ?></td>
+                                <td class="py-3 px-2 text-center font-mono text-xs text-slate-600 whitespace-nowrap"><?= e($cat['sort_order']) ?></td>
                                 <td class="py-3 px-2.5 text-center whitespace-nowrap">
-                                    <span class="px-2 py-0.5 rounded-full text-[11px] font-bold <?= $cat['status'] ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200' ?>">
-                                        <?= $cat['status'] ? 'Hiển thị' : 'Đang ẩn' ?>
+                                    <span class="px-2 py-0.5 rounded-full text-[11px] font-bold <?= e($cat['status'] ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200') ?>">
+                                        <?= e($cat['status'] ? 'Hiển thị' : 'Đang ẩn') ?>
                                     </span>
                                 </td>
                                 <td class="py-3 pr-4 pl-2 text-right whitespace-nowrap">
                                     <div class="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
-                                        <button type="button" onclick="editCategory(<?= htmlspecialchars(json_encode($cat)) ?>)" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0">
+                                        <button type="button" onclick="editCategory(<?= e(js(browser_record('categories', $cat))) ?>)" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0">
                                             <i class="fa-solid fa-pen-to-square text-[11px]"></i><span>Sửa</span>
                                         </button>
-                                        <button type="button" onclick="confirmDeleteCat(<?= $cat['id'] ?>, '<?= addslashes($cat['name']) ?>')" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/60 inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0">
+                                        <button type="button" onclick="confirmDeleteCat(<?= e(js(public_reference('categories', (int)$cat['id']))) ?>, <?= e(js($cat['name'])) ?>)" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/60 inline-flex items-center gap-1 transition-colors cursor-pointer shrink-0">
                                             <i class="fa-solid fa-trash text-[11px]"></i><span>Xóa</span>
                                         </button>
                                     </div>
@@ -136,14 +159,14 @@ if ($db) {
                         <tr><td colspan="7" class="py-8 text-center text-xs text-slate-400">Chưa có danh mục nào.</td></tr>
                     <?php endif; ?>
                 </tbody>
-            </table>
+            </table></div>
         </div>
     </div>
 </div>
 
 <!-- MODAL THÊM / SỬA DANH MỤC (Chuẩn SaaS Backdrop & Overlay - Phủ Kín Toàn Màn Hình) -->
 <div id="catModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm" onclick="if (event.target === this) closeCatModal()">
-    <div class="max-h-[92vh] overflow-y-auto w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200/80 p-5 sm:p-6 my-auto relative">
+    <div class="max-h-[92dvh] overflow-y-auto w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200/80 p-5 sm:p-6 my-auto relative">
         <!-- Modal Header -->
         <div class="flex items-center justify-between pb-3.5 border-b border-slate-100 gap-4">
             <div class="flex items-center gap-3">
@@ -162,7 +185,7 @@ if ($db) {
 
         <form method="POST" action="" class="space-y-3 mt-4">
             <input type="hidden" name="action_save" value="1">
-            <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+            <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="category_id" id="catId" value="0">
 
             <div>

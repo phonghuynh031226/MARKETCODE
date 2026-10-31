@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 require_once __DIR__ . '/../config/config.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -8,12 +9,14 @@ if (!is_logged() || !$db) {
 }
 
 $user = current_user();
-$lastId = (int)($_GET['last_id'] ?? 0);
+$cursor = $_GET['last_id'] ?? '';
+$lastId = $cursor === '' ? 0 : public_id_to_internal($db, 'bank_transactions', $cursor);
+if ($cursor !== '' && $lastId === 0) { http_response_code(422); json_response(false, 'Mã giao dịch không hợp lệ.'); }
 
 try {
     // Tìm giao dịch ngân hàng thành công gần nhất của user tạo trong 10 phút qua
-    $stmt = $db->prepare("SELECT * FROM bank_transactions 
-                          WHERE user_id = ? AND status = 'success' AND id > ? AND created_at >= NOW() - INTERVAL 10 MINUTE 
+    $stmt = $db->prepare("SELECT * FROM bank_transactions
+                          WHERE user_id = ? AND status = 'success' AND id > ? AND created_at >= NOW() - INTERVAL 10 MINUTE
                           ORDER BY id DESC LIMIT 1");
     $stmt->execute([$user['id'], $lastId]);
     $tx = $stmt->fetch();
@@ -21,7 +24,7 @@ try {
     if ($tx) {
         json_response(true, 'Giao dịch thành công', [
             'has_new'    => true,
-            'tx_id'      => $tx['id'],
+            'tx_id'      => $tx['public_id'],
             'amount'     => (float)$tx['amount'],
             'amount_fmt' => format_money($tx['amount']),
             'new_balance'=> format_money($user['balance'])
@@ -32,5 +35,5 @@ try {
         ]);
     }
 } catch (Exception $e) {
-    json_response(false, 'Lỗi kiểm tra giao dịch: ' . $e->getMessage());
+    json_response(false, 'Lỗi kiểm tra giao dịch: ' . public_error($e));
 }

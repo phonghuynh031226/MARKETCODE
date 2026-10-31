@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 $pageTitle = "Quên Mật Khẩu - Khôi Phục Tài Khoản";
 require_once __DIR__ . '/config/config.php';
 
@@ -15,21 +16,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'] ?? '')) {
         $error = 'CSRF Token không hợp lệ. Vui lòng thử lại!';
     } else {
-        $email = trim(filter_var($_POST['email'] ?? '', FILTER_SANITIZE_EMAIL));
+        $email = strtolower(trim($_POST['email'] ?? ''));
 
         if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Vui lòng nhập địa chỉ email hợp lệ!';
+        } elseif (!security_rate_limit('reset-request-ip:' . ($_SERVER['REMOTE_ADDR'] ?? ''), 10, 900)
+            || !security_rate_limit('reset-request-email:' . strtolower($email), 3, 900)) {
+            $error = 'Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút.';
+        } elseif (strlen(security_config('RESET_TOKEN_KEY')) < 32 || !filter_var(security_config('RESET_MAIL_FROM'), FILTER_VALIDATE_EMAIL)) {
+            $error = 'Khôi phục mật khẩu đang tạm khóa. Vui lòng liên hệ quản trị viên.';
         } else {
             try {
-                $stmt = $db->prepare("SELECT id, username, email FROM users WHERE email = ? LIMIT 1");
+                $stmt = $db->prepare("SELECT id, username, email FROM users WHERE email = ? AND deleted_at IS NULL AND status = 'active' LIMIT 1");
                 $stmt->execute([$email]);
                 $user = $stmt->fetch();
 
                 if (!$user) {
-                    $error = 'Email này chưa được đăng ký trong hệ thống!';
+                    $success = 'Nếu email đã được đăng ký, hệ thống sẽ gửi mã xác thực đến hộp thư của bạn.';
                 } else {
                     // Tạo mã OTP 6 số ngẫu nhiên
-                    $otp = sprintf("%06d", mt_rand(100000, 999999));
+                    $otp = (string)random_int(100000, 999999);
 
                     // Xóa các mã cũ của email này nếu có
                     $delStmt = $db->prepare("DELETE FROM password_resets WHERE email = ?");
@@ -37,18 +43,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     // Lưu mã xác thực mới vào bảng password_resets
                     $insStmt = $db->prepare("INSERT INTO password_resets (email, token, created_at) VALUES (?, ?, NOW())");
-                    $insStmt->execute([$email, $otp]);
+                    $insStmt->execute([$email, reset_token_digest($email, $otp)]);
 
                     // Lưu email và OTP vào session (giúp test dễ dàng trên môi trường localhost không có SMTP)
                     $_SESSION['reset_email'] = $email;
-                    $_SESSION['latest_otp']  = $otp;
-                    $_SESSION['flash_otp_msg'] = "Mã xác thực OTP đã được tạo: <strong class='text-indigo-600 font-mono text-base px-2 py-0.5 bg-indigo-50 rounded-lg border border-indigo-200'>$otp</strong> (Hiệu lực trong 15 phút).";
+                    unset($_SESSION['latest_otp'], $_SESSION['flash_otp_msg']);
+                    $sent = mail($email, 'Ma xac thuc khoi phuc mat khau', 'Ma xac thuc cua ban: ' . $otp . '. Hieu luc 15 phut. Khong chia se ma nay.', 'From: ' . security_config('RESET_MAIL_FROM'));
+                    if (!$sent) {
+                        $delStmt->execute([$email]);
+                        throw new RuntimeException('Password reset email delivery failed');
+                    }
 
                     header("Location: " . BASE_URL . "/reset-password");
                     exit;
                 }
             } catch (Exception $e) {
-                $error = 'Lỗi hệ thống: ' . $e->getMessage();
+                $error = 'Lỗi hệ thống: ' . public_error($e);
             }
         }
     }
@@ -72,7 +82,7 @@ require_once __DIR__ . '/includes/navbar.php';
 }
 </style>
 
-<div class="flex-1 flex items-center justify-center py-10 sm:py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-[#F8FAFC] min-h-[calc(100vh-140px)]">
+<div class="flex-1 flex items-center justify-center py-10 sm:py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-[#F8FAFC] min-h-[calc(100dvh-140px)]">
     <!-- 1. Quầng Sáng Mesh Gradient Nổi Bật Phía Sau -->
     <div class="absolute -top-28 -left-20 w-[520px] h-[520px] bg-gradient-to-tr from-indigo-500/25 via-indigo-300/15 to-transparent rounded-full blur-[110px] pointer-events-none mesh-pulse-1"></div>
     <div class="absolute top-1/2 -right-28 w-[480px] h-[480px] bg-gradient-to-bl from-cyan-400/25 via-sky-300/15 to-transparent rounded-full blur-[120px] pointer-events-none mesh-pulse-2"></div>
@@ -83,7 +93,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
     <!-- 2. Khung Form Chính (Floating Card & Layered Shadows chuẩn Stripe/Linear) -->
     <div class="max-w-4xl w-full grid grid-cols-1 lg:grid-cols-12 rounded-3xl bg-white/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(15,23,42,0.15)] border border-slate-200/80 overflow-hidden relative z-10 transition-all duration-300">
-        
+
         <!-- NỬA BÊN TRÁI: BRAND PANEL (TINH CHỈNH SANG TRỌNG) -->
         <div class="hidden lg:flex lg:col-span-5 flex-col justify-between p-8 md:p-10 bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 text-white relative overflow-hidden select-none">
             <!-- Vòng tròn ánh sáng mờ đa tầng -->
@@ -94,7 +104,7 @@ require_once __DIR__ . '/includes/navbar.php';
             <!-- Top Header & Cam kết thương hiệu -->
             <div class="relative z-10 space-y-6">
                 <!-- Logo Brand -->
-                <a href="<?= BASE_URL ?>/" class="flex items-center gap-3 group">
+                <a href="<?= e(BASE_URL) ?>/" class="flex items-center gap-3 group">
                     <?php
                     $authLogo = get_setting('site_logo', '');
                     $authLogoUrl = '';
@@ -106,7 +116,7 @@ require_once __DIR__ . '/includes/navbar.php';
                     }
                     ?>
                     <?php if (!empty($authLogoUrl)): ?>
-                        <img src="<?= htmlspecialchars($authLogoUrl) ?>" alt="Logo" class="w-11 h-11 rounded-2xl object-cover border border-white/20 shadow-inner group-hover:scale-105 transition-transform">
+                        <img src="<?= e($authLogoUrl) ?>" alt="Logo" class="w-11 h-11 rounded-2xl object-cover border border-white/20 shadow-inner group-hover:scale-105 transition-transform">
                     <?php else: ?>
                         <div class="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-inner group-hover:scale-105 transition-transform">
                             <i class="fa-solid fa-code text-lg"></i>
@@ -173,7 +183,7 @@ require_once __DIR__ . '/includes/navbar.php';
         <div class="lg:col-span-7 p-6 sm:p-10 flex flex-col justify-center bg-white/95">
             <!-- Nút Quay lại Đăng Nhập -->
             <div class="mb-5">
-                <a href="<?= BASE_URL ?>/login" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors">
+                <a href="<?= e(BASE_URL) ?>/login" class="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors">
                     <i class="fa-solid fa-arrow-left text-[11px]"></i>
                     <span>Quay lại trang Đăng Nhập</span>
                 </a>
@@ -202,7 +212,7 @@ require_once __DIR__ . '/includes/navbar.php';
 
             <!-- Form Nhập Email -->
             <form method="POST" action="" class="space-y-4">
-                <input type="hidden" name="csrf_token" value="<?= csrf_token() ?>">
+                <input type="hidden" name="csrf_token" value="<?= e(csrf_token()) ?>">
 
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Địa chỉ Email tài khoản *</label>
@@ -210,7 +220,7 @@ require_once __DIR__ . '/includes/navbar.php';
                         <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                             <i class="fa-regular fa-envelope text-sm"></i>
                         </div>
-                        <input type="email" name="email" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required autofocus placeholder="name@example.com" class="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50/80 text-sm text-slate-900 border border-slate-200/80 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400 transition-all duration-200 font-medium">
+                        <input type="email" name="email" value="<?= e($_POST['email'] ?? '') ?>" required autofocus placeholder="name@example.com" class="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-50/80 text-sm text-slate-900 border border-slate-200/80 focus:bg-white focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400 transition-all duration-200 font-medium">
                     </div>
                     <span class="text-[11px] text-slate-400 mt-1 block">Email đã sử dụng khi đăng ký tài khoản trên MarketCode.</span>
                 </div>
@@ -225,7 +235,7 @@ require_once __DIR__ . '/includes/navbar.php';
             <!-- Hỗ trợ thêm -->
             <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                 <span>Bạn nhớ lại mật khẩu?</span>
-                <a href="<?= BASE_URL ?>/login" class="font-bold text-indigo-600 hover:underline">
+                <a href="<?= e(BASE_URL) ?>/login" class="font-bold text-indigo-600 hover:underline">
                     Đăng nhập ngay
                 </a>
             </div>
